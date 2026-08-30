@@ -152,7 +152,7 @@ backend:
         -working: true
         -agent: "testing"
         -comment: "✅ Profile tests passed: POST /profile with user_type, finance, and initial_goal creates profile. GET /profile returns profile. Initial goal was successfully created and appears in goals list."
-  - task: "OCR receipt (demo) - POST /api/ocr/receipt"
+  - task: "OCR receipt (LIVE OCR.space + Emergent LLM) - POST /api/ocr/receipt"
     implemented: true
     working: true
     file: "/app/app/api/[[...path]]/route.js"
@@ -166,6 +166,12 @@ backend:
         -working: true
         -agent: "testing"
         -comment: "✅ OCR validation tests passed: Missing image returns 400 code bad_image. Non-image data URL (text/plain) returns 400 code bad_mime. Valid PNG data URL returns 200 with extraction containing merchant, date, currency, total, total_confidence, items, needs_user_verification and mode=demo."
+        -working: true
+        -agent: "main"
+        -comment: "LIVE OCR now enabled (OCR_MODE=live, OCR.space + Emergent LLM structuring, Zod-validated, demo fallback). Diagnostic with a generated receipt PNG returned mode='live' and correctly parsed merchant/date/total 234/4 items. Please RETEST OCR: (a) generate a small receipt-like PNG with PIL (pillow is installed) and POST it -> expect mode 'live' or 'demo_fallback' (both acceptable) with valid extraction shape; (b) validation errors still 400; (c) consent gating still 403; (d) saving a receipt still masks phone numbers."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ LIVE OCR FULLY TESTED AND WORKING: Generated receipt PNG with PIL (merchant 'FRESH MART GROCERY', date 2025-06-20, 4 items, total Rs 405). OCR.space successfully extracted text and Emergent LLM structured it correctly. Response mode='live' with all required fields (merchant, date, currency, total, total_confidence, items array with 4 items, needs_user_verification). Validation regressions passed: missing image → 400 bad_image, text/plain data URL → 400 bad_mime. Consent gating regression passed: fresh email user without consent → 403 consent_required. Save-masking regression passed: receipt with phone '9876543210' correctly masked to '••••• masked' and sensitive_masked=['phone']. Insights/generate sanity check passed: returns insight with source='llm'. All 7 test scenarios passed successfully."
   - task: "Receipts CRUD + private image - /api/receipts, /api/receipts/:id, /api/receipts/:id/image"
     implemented: true
     working: true
@@ -358,3 +364,26 @@ agent_communication:
       13. My Data (2 tests): GET /my-data/export returns complete export. POST /my-data/delete successfully removes all data (verified by dashboard 400/403 and empty receipts).
       
       NO CRITICAL ISSUES FOUND. All endpoints return correct status codes, error codes, and data structures as specified.
+
+    -agent: "testing"
+    -message: |
+      ✅ LIVE OCR RE-TEST COMPLETE - ALL 7 TESTS PASSED
+      
+      Focused re-test of OCR receipt endpoint after enabling LIVE OCR mode (OCR_MODE=live, OCR_PROVIDER=ocrspace, OCR_API_KEY set):
+      
+      1. ✅ LIVE OCR Integration: Generated receipt PNG using PIL with merchant "FRESH MART GROCERY", date "2025-06-20", 4 items (Milk, Bread, Eggs, Rice), total Rs 405.00. OCR.space successfully extracted text and Emergent LLM (gpt-4o-mini) structured it into valid JSON. Response mode='live' (not fallback!).
+      
+      2. ✅ Extraction Structure: All required fields present and valid - merchant: "FRESH MARTGROCERY" (OCR spacing issue but readable), date: "2025-06-20", currency: "INR", total: 405, total_confidence: 1, items: array with 4 items, needs_user_verification: [].
+      
+      3. ✅ Validation Regression: Missing image → 400 bad_image ✓, text/plain data URL → 400 bad_mime ✓
+      
+      4. ✅ Consent Gating Regression: Fresh email user (ocrtest+h3v3rjei@example.com) without consent → 403 consent_required ✓
+      
+      5. ✅ Save-Masking Regression: Receipt with merchant "Store Call 9876543210" correctly masked to "Store Call ••••• masked", sensitive_masked=['phone'] ✓
+      
+      6. ✅ Insights Sanity Check: POST /api/insights/generate returns insight with source='llm' (Emergent LLM working) ✓
+      
+      OBSERVED MODE: 'live' (OCR.space + LLM structuring working correctly)
+      NO 500 ERRORS, NO TIMEOUTS, NO CRASHES
+      
+      The LIVE OCR integration is fully functional. OCR.space extracts text from receipt images, Emergent LLM structures it into Zod-validated JSON, and the system gracefully falls back to demo data on any failure. All validation, consent gating, and masking features remain intact.

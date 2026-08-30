@@ -20,7 +20,28 @@ export function ReceiptUploader({ onScan, scanning }) {
     if (!ALLOWED.includes(file.type)) { setError('Please choose a JPG, PNG or WebP image.'); return; }
     if (file.size > MAX) { setError('Image must be under 10 MB.'); return; }
     const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result);
+    reader.onload = () => {
+      // Downscale to a JPEG (<= ~1600px). This keeps it under OCR limits and strips EXIF metadata.
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 1600;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          setPreview(canvas.toDataURL('image/jpeg', 0.72));
+        } catch (e) {
+          setPreview(reader.result);
+        }
+      };
+      img.onerror = () => setPreview(reader.result);
+      img.src = reader.result;
+    };
     reader.readAsDataURL(file);
   };
 
