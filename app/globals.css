@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 160 30% 98%;
+    --foreground: 215 40% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 40% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 40% 16%;
+    --primary: 168 72% 34%;
+    --primary-foreground: 160 40% 98%;
+    --secondary: 165 42% 94%;
+    --secondary-foreground: 174 55% 22%;
+    --muted: 200 20% 95%;
+    --muted-foreground: 215 16% 42%;
+    --accent: 165 45% 92%;
+    --accent-foreground: 174 55% 22%;
+    --destructive: 4 74% 57%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 22% 88%;
+    --input: 200 22% 88%;
+    --ring: 168 72% 34%;
+    --chart-1: 168 72% 40%;
+    --chart-2: 150 58% 45%;
+    --chart-3: 38 92% 55%;
+    --chart-4: 215 55% 45%;
+    --chart-5: 262 52% 62%;
+    --radius: 0.75rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 168 72% 34%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 165 45% 92%;
+    --sidebar-accent-foreground: 174 55% 22%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 168 72% 34%;
+  }
+  .dark {
+    --background: 215 40% 8%;
+    --foreground: 160 40% 98%;
+    --card: 215 38% 11%;
+    --card-foreground: 160 40% 98%;
+    --popover: 215 38% 11%;
+    --popover-foreground: 160 40% 98%;
+    --primary: 168 65% 42%;
+    --primary-foreground: 215 40% 8%;
+    --secondary: 215 30% 18%;
+    --secondary-foreground: 160 40% 98%;
+    --muted: 215 30% 18%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 215 30% 18%;
+    --accent-foreground: 160 40% 98%;
+    --destructive: 4 74% 57%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 30% 20%;
+    --input: 215 30% 20%;
+    --ring: 168 65% 42%;
+    --chart-1: 168 65% 45%;
+    --chart-2: 150 55% 50%;
+    --chart-3: 38 92% 60%;
+    --chart-4: 215 60% 60%;
+    --chart-5: 262 55% 68%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .bg-grid-soft {
+    background-image: radial-gradient(hsl(var(--primary) / 0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+}
