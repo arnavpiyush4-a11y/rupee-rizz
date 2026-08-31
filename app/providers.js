@@ -1,6 +1,6 @@
 'use client';
 
-// RupeeRizz global client context: REAL Supabase auth (email/password + Google OAuth + OTP reset),
+// RupeeRizz global client context: REAL Supabase auth (email/password + OTP recovery reset),
 // plus profile / consent / language. Sessions persist via the Supabase browser client.
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -80,13 +80,6 @@ export function Providers({ children }) {
     await refresh();
     return data;
   };
-  const signInGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
-    });
-    if (error) throw error;
-  };
   const resetPassword = async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
@@ -109,7 +102,7 @@ export function Providers({ children }) {
     <QueryClientProvider client={queryClient}>
       <AppCtx.Provider value={{
         lang, setLang, uid, user, profile, consent, ready, refresh, setProfile,
-        signUpEmail, signInEmail, signInGoogle, resetPassword, verifyOtpAndSetPassword,
+        signUpEmail, signInEmail, resetPassword, verifyOtpAndSetPassword,
         signOut, logout: signOut,
       }}>
         {children}

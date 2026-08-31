@@ -52,7 +52,7 @@ export function Landing({ onGetStarted, onDemo }) {
             <h1 className="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">{t(lang, 'hero_title')}</h1>
             <p className="mt-4 text-lg text-muted-foreground max-w-xl">{t(lang, 'hero_sub')}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button size="lg" onClick={onGetStarted}>{t(lang, 'continue_google')} <ArrowRight className="h-4 w-4 ml-1" /></Button>
+              <Button size="lg" onClick={onGetStarted}>{t(lang, 'get_started')} <ArrowRight className="h-4 w-4 ml-1" /></Button>
               <Button size="lg" variant="outline" onClick={onDemo}>{t(lang, 'try_demo')}</Button>
             </div>
             <p className="mt-4 text-sm font-medium text-primary">{t(lang, 'no_loan_push')}</p>
