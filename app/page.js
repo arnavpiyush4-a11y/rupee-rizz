@@ -6,7 +6,6 @@ import { useApp } from '@/app/providers';
 import { AppShell } from '@/components/rupee/AppShell';
 import { Landing } from '@/components/rupee/views/Landing';
 import { AuthView } from '@/components/rupee/views/AuthView';
-import { DemoView } from '@/components/rupee/views/DemoView';
 import { ConsentView } from '@/components/rupee/views/ConsentView';
 import { Onboarding } from '@/components/rupee/views/Onboarding';
 import { Dashboard } from '@/components/rupee/views/Dashboard';
@@ -17,10 +16,11 @@ import { FinancialHealthView } from '@/components/rupee/views/FinancialHealthVie
 import { OptionsView } from '@/components/rupee/views/OptionsView';
 import { BeforeYouBorrowView } from '@/components/rupee/views/BeforeYouBorrowView';
 import { MyDataView } from '@/components/rupee/views/MyDataView';
+import { ReadinessReport } from '@/components/rupee/views/ReadinessReport';
 
-const PUBLIC = ['landing', 'auth', 'demo'];
-const PREAPP = ['landing', 'auth', 'demo', 'consent', 'onboarding'];
-const APP_ROUTES = ['dashboard', 'receipts', 'plan', 'goals', 'financial-health', 'options', 'before-you-borrow', 'my-data'];
+const PUBLIC = ['landing', 'auth'];
+const PREAPP = ['landing', 'auth', 'consent', 'onboarding'];
+const APP_ROUTES = ['dashboard', 'receipts', 'plan', 'goals', 'financial-health', 'options', 'before-you-borrow', 'my-data', 'report'];
 
 function FullLoader() {
   return (
@@ -46,9 +46,8 @@ function App() {
   if (!ready) return <FullLoader />;
 
   if (!uid) {
-    if (route === 'auth') return <AuthView onBack={() => nav('landing')} onDone={() => {}} onDemo={() => nav('demo')} />;
-    if (route === 'demo') return <DemoView onBack={() => nav('landing')} onStarted={() => {}} />;
-    return <Landing onGetStarted={() => nav('auth')} onDemo={() => nav('demo')} />;
+    if (route === 'auth') return <AuthView onBack={() => nav('landing')} onDone={() => {}} />;
+    return <Landing onGetStarted={() => nav('auth')} onDemo={() => nav('auth')} />;
   }
 
   if (!consent?.active) return <ConsentView onAgreed={() => {}} />;
@@ -65,6 +64,7 @@ function App() {
       {current === 'options' && <OptionsView />}
       {current === 'before-you-borrow' && <BeforeYouBorrowView />}
       {current === 'my-data' && <MyDataView />}
+      {current === 'report' && <ReadinessReport onNav={nav} />}
     </AppShell>
   );
 }

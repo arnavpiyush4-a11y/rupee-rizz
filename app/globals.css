@@ -84,3 +84,10 @@
     background-size: 22px 22px;
   }
 }
+
+@media print {
+  header, footer, .no-print { display: none !important; }
+  main { padding: 0 !important; }
+  body { background: #ffffff !important; }
+  .rr-report { border: none !important; box-shadow: none !important; max-width: 100% !important; padding: 0 !important; }
+}

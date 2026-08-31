@@ -1,5 +1,5 @@
 'use client';
-import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet } from 'lucide-react';
+import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '@/app/providers';
 import { t, LANGS } from '@/lib/i18n';
@@ -71,6 +71,7 @@ export function AppShell({ route, onNav, children }) {
                   <div className="text-xs text-muted-foreground font-normal">{typeLabel}{user?.is_demo ? ' \u00b7 Demo' : ''}</div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onNav('report')}><FileText className="h-4 w-4 mr-2" /> Readiness Report</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onNav('my-data')}><ShieldCheck className="h-4 w-4 mr-2" /> {t(lang, 'nav_mydata')}</DropdownMenuItem>
                 <DropdownMenuItem onClick={logout} className="text-rose-600"><LogOut className="h-4 w-4 mr-2" /> {t(lang, 'sign_out')}</DropdownMenuItem>
               </DropdownMenuContent>

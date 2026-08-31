@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScanLine, PiggyBank, Landmark, TrendingUp, TrendingDown, Wallet, Coins, Receipt, HeartPulse, Sparkles, Loader2, ArrowRight, ChevronRight } from 'lucide-react';
+import { ScanLine, PiggyBank, Landmark, TrendingUp, TrendingDown, Wallet, Coins, Receipt, HeartPulse, Sparkles, Loader2, ArrowRight, ChevronRight, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/apiClient';
 import { useApp } from '@/app/providers';
@@ -59,6 +59,7 @@ export function Dashboard({ onNav }) {
           <Button size="sm" onClick={() => onNav('receipts')}><ScanLine className="h-4 w-4 mr-1" /> {t(lang, 'scan_receipt')}</Button>
           <Button size="sm" variant="outline" onClick={() => onNav('plan')}><PiggyBank className="h-4 w-4 mr-1" /> {t(lang, 'view_plan')}</Button>
           <Button size="sm" variant="outline" onClick={() => onNav('options')}><Landmark className="h-4 w-4 mr-1" /> {t(lang, 'explore_schemes')}</Button>
+          <Button size="sm" variant="outline" onClick={() => onNav('report')}><FileText className="h-4 w-4 mr-1" /> Readiness Report</Button>
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import { t } from '@/lib/i18n';
 import { UserTypeSelector } from '@/components/rupee/UserTypeSelector';
 import { computeSnapshot } from '@/lib/finance';
 import { formatINR } from '@/lib/format';
+import { DEMO_PROFILES } from '@/lib/demo';
 
 const PATHWAYS = {
   student: [{ key: 'scan_save', label: 'Scan Receipts & Save' }, { key: 'plan_my_money', label: 'Plan My Money' }],
@@ -73,12 +74,45 @@ export function Onboarding({ onDone }) {
   const setField = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const isEnt = userType === 'micro_entrepreneur';
 
+  const applyPreset = (key) => {
+    const p = DEMO_PROFILES[key];
+    setUserType(p.user_type);
+    setPathway(p.pathway || PATHWAYS[p.user_type][1].key);
+    setState(p.state || '');
+    setBusinessType(p.business_type || '');
+    setIncomeType(p.finance.income_type || 'regular');
+    setF({
+      reliable_monthly_income: p.finance.reliable_monthly_income,
+      essential_expenses: p.finance.essential_expenses,
+      non_essential_expenses: p.finance.non_essential_expenses,
+      compulsory_emi: p.finance.compulsory_emi,
+      business_operating_costs: p.finance.business_operating_costs,
+      current_savings: p.finance.current_savings,
+      emergency_fund_amount: p.finance.emergency_fund_amount,
+    });
+    const g = p.goals[0];
+    setGoalName(p.user_type === 'student' ? 'Laptop / Phone' : g.goal_name);
+    setGoalAmount(g.goal_amount);
+    setGoalSaved(g.current_saved_amount);
+    setGoalDate(g.target_date);
+    toast.success(`Filled sample data for ${p.full_name}. Edit anything, then continue.`);
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t(lang, 'who_are_you')}</h1>
         <p className="text-muted-foreground text-sm">This tailors your plan, goals and support options.</p>
       </div>
+
+      <Card className="p-4 bg-secondary/40 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="text-sm flex-1"><span className="font-medium">Quick start:</span> prefill sample data (you can edit everything before saving).</div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => applyPreset('student')}><Sparkles className="h-3.5 w-3.5 mr-1" /> Arnav (student)</Button>
+          <Button size="sm" variant="outline" onClick={() => applyPreset('entrepreneur')}><Sparkles className="h-3.5 w-3.5 mr-1" /> Priya (micro-entrepreneur)</Button>
+        </div>
+      </Card>
+
       <UserTypeSelector value={userType} onChange={(v) => { setUserType(v); setPathway(PATHWAYS[v][v === 'student' ? 1 : 1].key); }} />
 
       <Card className="p-5 space-y-3">
