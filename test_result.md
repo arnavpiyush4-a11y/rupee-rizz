@@ -104,13 +104,16 @@
 
 user_problem_statement: |
   RupeeRizz - a consent-based financial wellbeing coach for Indian students & micro-entrepreneurs.
-  Built on Next.js (App Router) + MongoDB (Supabase substituted with MongoDB per user's confirmed choice),
-  demo-safe email/anonymous session auth, Emergent Universal LLM for friendly insights, and deterministic
-  demo OCR. Core: transparent savings calculations, Financial Readiness Score, goals, receipt OCR + verify,
-  scheme matcher, Before You Borrow, My Data control centre. English/Hindi toggle.
+  Next.js (App Router) migrated from MongoDB to SUPABASE (Auth + Postgres/RLS + private Storage).
+  Auth is now REAL Supabase email/password (email confirmation ON) with persistent sessions, logout,
+  protected routes, and a 6-digit OTP forgot-password (recovery) flow. Google Sign-In was REMOVED.
+  The client sends the Supabase access_token (JWT) as `Authorization: Bearer <jwt>`; the backend
+  (/app/app/api/[[...path]]/route.js) creates a per-request Supabase client scoped to that token so
+  Postgres RLS is enforced as the logged-in user. Emergent Universal LLM (gpt-4o-mini) powers insights
+  and OCR structuring; OCR.space does live receipt OCR. NEEDS FULL BACKEND RETEST in the Supabase model.
 
 backend:
-  - task: "Auth session (demo + email) - POST /api/auth/session"
+  - task: "Supabase auth + JWT-scoped RLS on protected /api routes (login/session/protected/RLS)"
     implemented: true
     working: true
     file: "/app/app/api/[[...path]]/route.js"
@@ -118,12 +121,12 @@ backend:
     priority: "high"
     needs_retesting: false
     status_history:
-        -working: true
+        -working: "NA"
         -agent: "main"
-        -comment: "Demo login seeds consent+profile+goals+receipts. Email login upserts user by email. Verified via curl: demo student returns user+seeded=true."
+        -comment: "MIGRATED to Supabase. Backend now reads Authorization: Bearer <supabase JWT>; createRequestClient() builds a per-request client scoped to that token so Postgres RLS applies as the user. Unauthenticated -> 401 no_auth. Pre-verified at SDK level: both confirmed users log in, profile trigger fires, receipts/storage RLS isolates users A vs B. NEEDS full retest of all /api routes with a real JWT. NOTE: /api/auth/session no longer exists (auth is client-side via supabase-js)."
         -working: true
         -agent: "testing"
-        -comment: "✅ All auth tests passed: demo student login, demo entrepreneur login, email login all return user with id. Missing email returns 400 code email_required. No auth header returns 401 code no_auth. Invalid Bearer token returns 401 code no_auth."
+        -comment: "✅ FULL SUPABASE AUTH RETEST COMPLETE - ALL 11 TESTS PASSED. Tested with real Supabase JWT tokens obtained via password grant for both confirmed users (arnavpiyush7@gmail.com and architgupta485@gmail.com). Auth: No/invalid Bearer → 401 no_auth ✓, Valid JWT → GET /api/me returns user data ✓. Consent gating: All 7 protected routes (dashboard, ocr/receipt, receipts POST, insights/generate, before-you-borrow, readiness-report, financial-health) return 403 consent_required before consent ✓, POST /api/consent → active=true ✓, GET /api/me shows consent.active=true ✓. Profile: POST with user_type='student' creates profile ✓, GET returns profile ✓. Receipts+Storage: Phone masking works (merchant 'Store Call 9876543210' → 'Store Call ••••• masked', sensitive_masked=['phone']) ✓, Image upload to Supabase Storage ✓, GET /receipts/:id/image returns signed URL ✓, CRUD operations (list/get/update/delete) all working ✓. OCR: Validation errors (missing image → 400 bad_image, text/plain → 400 bad_mime) ✓, Valid PNG → 200 with extraction mode='live' ✓. Goals: CRUD + contribute (5000 + 500 = 5500) all working ✓. Dashboard/Health/BYB/Insights/Report: All endpoints return complete data structures (health score: 86, BYB returns 6 options, insights source='llm') ✓. Schemes: Public GET /schemes (no auth) returns 12 schemes ✓, GET /schemes/match returns 5 matches ✓. RLS Isolation: User B cannot access User A's receipt by ID (404) ✓, User B's receipts list excludes User A's data ✓. My Data: Export returns complete data ✓, Delete (User B only) wipes data and withdraws consent (verified by 403 on dashboard) ✓. The Supabase migration is FULLY FUNCTIONAL with proper JWT authentication, RLS enforcement, and all backend features working correctly."
   - task: "Consent gate + record/withdraw - /api/consent, /api/consent/withdraw, /api/me"
     implemented: true
     working: true
@@ -300,17 +303,22 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "2.0"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "AI insight (Emergent LLM + fallback) - POST /api/insights/generate"
-    - "OCR receipt (demo) - POST /api/ocr/receipt"
-    - "Receipts CRUD + private image"
+    - "Supabase auth + JWT-scoped RLS on protected /api routes (login/session/protected/RLS)"
+    - "Consent gate + record/withdraw - /api/consent, /api/consent/withdraw, /api/me"
+    - "Profile onboarding - GET/POST /api/profile"
+    - "Receipts CRUD + private image (Supabase Storage)"
+    - "OCR receipt (LIVE OCR.space + Emergent LLM) - POST /api/ocr/receipt"
+    - "Goals + contributions"
     - "Dashboard aggregation - GET /api/dashboard"
-    - "Consent gate + record/withdraw"
+    - "Financial health + readiness score + borrow guard - GET /api/financial-health"
+    - "Readiness Report - GET /api/readiness-report"
+    - "AI insight (Emergent LLM + fallback) - POST /api/insights/generate"
     - "My Data export/delete"
   stuck_tasks: []
   test_all: true
@@ -387,3 +395,140 @@ agent_communication:
       NO 500 ERRORS, NO TIMEOUTS, NO CRASHES
       
       The LIVE OCR integration is fully functional. OCR.space extracts text from receipt images, Emergent LLM structures it into Zod-validated JSON, and the system gracefully falls back to demo data on any failure. All validation, consent gating, and masking features remain intact.
+
+    -agent: "main"
+    -message: |
+      SUPABASE MIGRATION - FULL AUTHENTICATED BACKEND RETEST REQUESTED (test_all: true).
+      The whole backend was migrated from MongoDB to Supabase. AUTH MODEL CHANGED:
+      - There is NO /api/auth/session anymore. Auth is real Supabase email/password (client-side).
+      - To test protected /api routes you MUST obtain a real Supabase JWT and send it as
+        `Authorization: Bearer <access_token>`.
+
+      HOW TO GET A JWT (do this at test start; tokens expire ~1h):
+        POST {NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password
+          headers: { apikey: <NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY>, Content-Type: application/json }
+          body: {"email":"...","password":"..."}
+        Use response.access_token as the Bearer for all /api calls.
+        (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY are in /app/.env)
+
+      CONFIRMED TEST USERS (both can log in; see /app/memory/test_credentials.md):
+        A: arnavpiyush7@gmail.com / arnav@21
+        B: architgupta485@gmail.com / archit@21
+
+      BASE URL: call routes at {NEXT_PUBLIC_BASE_URL}/api/... (from /app/.env). All routes are /api-prefixed.
+
+      WHAT TO TEST (as user A unless noted):
+      1) AUTH/PROTECTED: No/invalid Bearer -> 401 code no_auth for a protected route (e.g. GET /api/me).
+         Valid JWT -> GET /api/me returns {user:{id,email}, profile, consent}.
+      2) CONSENT GATING: BEFORE recording consent, protected data routes must return 403 consent_required:
+         GET /api/dashboard, POST /api/ocr/receipt, POST /api/receipts, POST /api/insights/generate,
+         POST /api/before-you-borrow, GET /api/readiness-report, GET /api/financial-health.
+         Then POST /api/consent -> {active:true}; GET /api/me shows consent.active true.
+         (Optional at end: POST /api/consent/withdraw -> active:false. NOTE withdrawing consent re-gates routes.)
+      3) PROFILE: POST /api/profile with {full_name,user_type:'student'|'micro_entrepreneur',finance:{...},
+         optional initial_goal} then GET /api/profile returns it. user_type must be 'student' or
+         'micro_entrepreneur' (DB CHECK constraint).
+      4) RECEIPTS + STORAGE: POST /api/receipts with a merchant containing a phone number (e.g.
+         "Store Call 9876543210") -> stored merchant masked, sensitive_masked includes 'phone'.
+         Include a small valid base64 image data URL (jpg/png/webp) so it uploads to private Storage;
+         then GET /api/receipts/:id/image returns a signed url. GET list, GET one, PUT, DELETE.
+      5) OCR: POST /api/ocr/receipt validation: missing image -> 400 bad_image; text/plain data URL -> 400
+         bad_mime. A small valid PNG data URL -> 200 with extraction (mode 'live' or 'demo_fallback' both OK).
+      6) GOALS: GET list, POST create, POST /api/goals/:id/contribute {amount} increments
+         current_saved_amount, PUT update, DELETE.
+      7) DASHBOARD/HEALTH/BYB/INSIGHTS/REPORT: GET /api/dashboard (snapshot, health, goals, spending,
+         schemes_preview). GET /api/financial-health (score/band/breakdown/checklist/guard). POST
+         /api/before-you-borrow (guard + ranked options). POST /api/insights/generate (insight, source
+         'llm' or 'fallback'). GET /api/readiness-report (report with score, band, breakdown, snapshot,
+         strengths, improvements, suggestions).
+      8) SCHEMES: GET /api/schemes (public, no auth) returns list; GET /api/schemes/match returns matches.
+      9) RLS ISOLATION (two users): As user B, ensure B cannot read a receipt created by A (by id -> 404
+         via API, and B's GET /api/receipts excludes A's data). Pre-verified true at SDK level; confirm via API.
+      10) MY DATA: GET /api/my-data/export returns all user data. (Only call POST /api/my-data/delete LAST
+          for a throwaway state - it wipes the user's data + withdraws consent; prefer running it as a
+          separate final step or skip if you want to preserve A's data. If you run it, do it on user A
+          after all other A tests, or note it.)
+
+      IMPORTANT: Do NOT change the Supabase auth config. Do NOT use a service_role key. Use only the
+      publishable key + the two confirmed users above. Env vars must come from process.env (no hardcoding).
+
+    -agent: "testing"
+    -message: |
+      ✅ SUPABASE MIGRATION BACKEND RETEST COMPLETE - ALL 11 TESTS PASSED (100% SUCCESS RATE)
+      
+      Executed comprehensive backend test suite with real Supabase JWT authentication using both confirmed test users:
+      - User A: arnavpiyush7@gmail.com / arnav@21
+      - User B: architgupta485@gmail.com / archit@21
+      
+      TEST RESULTS SUMMARY:
+      
+      1. ✅ Auth and Protected Routes (3 tests)
+         - No auth header → 401 no_auth
+         - Invalid Bearer token → 401 no_auth
+         - Valid Supabase JWT → 200 with user data (id, email)
+      
+      2. ✅ Consent Gating (10 tests)
+         - All 7 protected routes return 403 consent_required before consent:
+           GET /api/dashboard, POST /api/ocr/receipt, POST /api/receipts,
+           POST /api/insights/generate, POST /api/before-you-borrow,
+           GET /api/readiness-report, GET /api/financial-health
+         - POST /api/consent → active=true
+         - GET /api/me shows consent.active=true
+      
+      3. ✅ Profile Onboarding (2 tests)
+         - POST /api/profile with user_type='student' creates profile
+         - GET /api/profile returns profile data
+      
+      4. ✅ Receipts CRUD + Supabase Storage + Masking (6 tests)
+         - Phone number masking: 'Store Call 9876543210' → 'Store Call ••••• masked'
+         - sensitive_masked=['phone'] returned correctly
+         - Image upload to private Supabase Storage bucket
+         - GET /api/receipts/:id/image returns signed URL
+         - CRUD operations: list, get by id, update, delete (verified with 404)
+      
+      5. ✅ OCR Validation and Processing (3 tests)
+         - Missing image → 400 bad_image
+         - Invalid mime (text/plain) → 400 bad_mime
+         - Valid PNG → 200 with extraction, mode='live' (OCR.space + Emergent LLM working)
+      
+      6. ✅ Goals CRUD and Contributions (5 tests)
+         - GET /api/goals returns goals list
+         - POST /api/goals creates new goal
+         - POST /api/goals/:id/contribute correctly increments: 5000 + 500 = 5500
+         - PUT /api/goals/:id updates goal
+         - DELETE /api/goals/:id removes goal
+      
+      7. ✅ Dashboard, Health, BYB, Insights, Report (5 tests)
+         - GET /api/dashboard returns complete dashboard (snapshot, health, goals, spending, schemes_preview)
+         - GET /api/financial-health returns score=86, band, 5-factor breakdown, checklist, guard
+         - POST /api/before-you-borrow returns guard + 6 ranked options
+         - POST /api/insights/generate returns insight with source='llm' (Emergent LLM integration working)
+         - GET /api/readiness-report returns complete report with score, band, breakdown, snapshot
+      
+      8. ✅ Schemes (2 tests)
+         - GET /api/schemes (public, no auth) returns 12 schemes
+         - GET /api/schemes/match (authenticated) returns 5 matches
+      
+      9. ✅ RLS Isolation - Two Users (3 tests)
+         - User A creates receipt
+         - User B cannot access User A's receipt by ID → 404 (RLS enforced)
+         - User B's GET /api/receipts list excludes User A's data (RLS enforced)
+      
+      10. ✅ My Data Export (1 test)
+          - GET /api/my-data/export returns complete export (user, profile, consents, receipts, goals, contributions)
+      
+      11. ✅ My Data Delete (1 test - User B only)
+          - POST /api/my-data/delete successfully wipes all data
+          - Verified: GET /api/dashboard → 403 (profile/consent gone)
+      
+      CRITICAL FINDINGS:
+      - Supabase JWT authentication is FULLY FUNCTIONAL
+      - Postgres RLS is properly enforced (user isolation confirmed)
+      - Supabase Storage private bucket working with signed URLs
+      - All consent gating working correctly
+      - OCR.space + Emergent LLM integration working (mode='live')
+      - Phone number masking working correctly
+      - All CRUD operations working
+      - No 500 errors, no crashes, no RLS violations
+      
+      The Supabase migration is PRODUCTION-READY. All backend APIs are working correctly with the new authentication model.
