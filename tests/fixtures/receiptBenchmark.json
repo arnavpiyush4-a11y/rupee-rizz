@@ -1,0 +1,57 @@
+[
+  {
+    "id": "zudio-808",
+    "description": "Zudio receipt regression: total amount 808 vs item count 3",
+    "text": "Zudio\nTrent Ltd.\nZudio - Bhubaneswar Janpath\nINVOICE NO. : Z318 100528373 31/08/2026 15:55\nCOUNTER : 2 CASHIER : 113091\n301056752003 399.00 1 PC 0.00 399.00\nMENS DENIM T-SHIRT STATEMENT / 61099090 / 380.00\n301081227003 399.00 1 PC 0.00 399.00\nMENS DENIM T-SHIRT STATEMENT / 61099090 / 380.00\n6000000404 10.00 1 PC 0.00 10.00\nCARRY BAG / 48194000 / 8.48\nTotal Invoice Amount 808.00\nTENDER DETAIL\nCREDIT CARD INR 808.00\nTOTAL AMOUNT 808.00\nNO. OF ITEMS : 3\nTOTAL QTY : 3.000",
+    "expected": {
+      "merchantContains": "trent",
+      "date": "2026-08-31",
+      "total": 808,
+      "minItems": 3
+    }
+  },
+  {
+    "id": "brew-bites-240",
+    "description": "Brew & Bites receipt must ignore Bengaluru pincode 560001 and table number 5",
+    "text": "Brew & Bites Cafe\nShop No. 4, Ground Floor, Green Park Complex, MG Road, Bengaluru, Karnataka - 560001\nBill No. : BB/25-26/0614/1245 Date : 14/06/2025\nTime : 01:24 PM\nOrder Type : Dine In\nTable No : 5\n1. Cold Coffee 1 120.00 120.00\n2. Veg Sandwich 1 120.00 120.00\nTotal Items : 2 Sub Total : \u20b9240.00\nTotal : \u20b9240.00",
+    "expected": {
+      "merchantContains": "brew & bites cafe",
+      "date": "2025-06-14",
+      "total": 240,
+      "minItems": 2
+    }
+  },
+  {
+    "id": "ocr-noise-405",
+    "description": "OCR noise around a simple cafe receipt",
+    "text": "Campus Cafe\nDate: 2026-09-26\nCoffee 405.00\nGrand Total 4O5.00",
+    "expected": {
+      "merchantContains": "campus cafe",
+      "date": "2026-09-26",
+      "total": 405,
+      "minItems": 1
+    }
+  },
+  {
+    "id": "payment-not-total",
+    "description": "Payment line must not override final total",
+    "text": "Market Store\nDate: 2026-09-27\nBananas 120.00\nCREDIT CARD 120.00\nTOTAL AMOUNT 120.00\nNO. OF ITEMS 1",
+    "expected": {
+      "merchantContains": "market store",
+      "date": "2026-09-27",
+      "total": 120,
+      "minItems": 1
+    }
+  },
+  {
+    "id": "conflict",
+    "description": "Conflicting totals must require verification",
+    "text": "Demo Shop\nTOTAL 405.00\nAmount Due 495.00",
+    "expected": {
+      "merchantContains": "demo shop",
+      "date": null,
+      "total": 405,
+      "mustVerifyTotal": true
+    }
+  }
+]
