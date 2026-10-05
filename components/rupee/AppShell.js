@@ -1,5 +1,5 @@
 'use client';
-import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText, Sparkles } from 'lucide-react';
+import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText, Sparkles, Sprout } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '@/app/providers';
 import { t, LANGS } from '@/lib/i18n';
@@ -11,6 +11,7 @@ const NAV = [
   { key: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard },
   { key: 'receipts', labelKey: 'nav_scan', icon: ScanLine },
   { key: 'plan', labelKey: 'nav_plan', icon: PiggyBank },
+  { key: 'grow', labelKey: 'nav_grow', icon: Sprout, testId: 'grow-nav-item' },
   { key: 'goals', labelKey: 'nav_goals', icon: Target },
   { key: 'options', labelKey: 'nav_options', icon: Landmark },
   { key: 'my-data', labelKey: 'nav_mydata', icon: ShieldCheck },
@@ -40,7 +41,7 @@ export function AppShell({ route, onNav, children }) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="container flex h-16 items-center justify-between gap-2">
+        <div className="container flex min-h-16 py-2 items-center justify-between gap-2">
           <button onClick={() => onNav('dashboard')} className="flex items-center gap-2 font-extrabold text-lg">
             <span className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><Wallet className="h-5 w-5" /></span>
             <span>Rupee<span className="text-primary">Rizz</span></span>

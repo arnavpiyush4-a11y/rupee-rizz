@@ -18,10 +18,11 @@ import { BeforeYouBorrowView } from '@/components/rupee/views/BeforeYouBorrowVie
 import { MyDataView } from '@/components/rupee/views/MyDataView';
 import { ReadinessReport } from '@/components/rupee/views/ReadinessReport';
 import { FinancialFutureLab } from '@/components/rupee/FinancialFutureLab';
+import { GrowSavingsView } from '@/components/rupee/views/GrowSavingsView';
 
 const PUBLIC = ['landing', 'auth'];
 const PREAPP = ['landing', 'auth', 'consent', 'onboarding'];
-const APP_ROUTES = ['dashboard', 'receipts', 'plan', 'goals', 'financial-health', 'options', 'before-you-borrow', 'my-data', 'report', 'money-lab'];
+const APP_ROUTES = ['dashboard', 'receipts', 'plan', 'goals', 'financial-health', 'options', 'before-you-borrow', 'my-data', 'report', 'money-lab', 'grow'];
 
 function FullLoader() {
   return (
@@ -67,6 +68,7 @@ function App() {
       {current === 'my-data' && <MyDataView />}
       {current === 'report' && <ReadinessReport onNav={nav} />}
       {current === 'money-lab' && <FinancialFutureLab data={null} onNav={nav} />}
+      {current === 'grow' && <GrowSavingsView />}
     </AppShell>
   );
 }
