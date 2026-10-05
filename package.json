@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "test:receipt": "node --test tests/receiptEngine.test.js",
+    "test:grow": "node --test tests/growCalculators.test.js tests/growRules.test.js",
     "benchmark:receipt": "node scripts/receiptBenchmark.mjs"
   },
   "dependencies": {

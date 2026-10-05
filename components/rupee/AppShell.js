@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText, Sparkles, X, Bell, ChevronRight, CircleUserRound } from 'lucide-react';
+import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText, Sparkles, X, Bell, ChevronRight, CircleUserRound, Sprout } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '@/app/providers';
 import { t, LANGS } from '@/lib/i18n';
@@ -14,6 +14,7 @@ const NAV = [
   { key: 'dashboard', labelKey: 'nav_dashboard', icon: LayoutDashboard, short: 'Home' },
   { key: 'receipts', labelKey: 'nav_scan', icon: ScanLine, short: 'Scan' },
   { key: 'plan', labelKey: 'nav_plan', icon: PiggyBank, short: 'Plan' },
+  { key: 'grow', labelKey: 'nav_grow', icon: Sprout, short: 'Grow', testId: 'grow-nav-item' },
   { key: 'goals', labelKey: 'nav_goals', icon: Target, short: 'Goals' },
   { key: 'options', labelKey: 'nav_options', icon: Landmark, short: 'Options' },
   { key: 'my-data', labelKey: 'nav_mydata', icon: ShieldCheck, short: 'Privacy' },
@@ -82,7 +83,7 @@ export function AppShell({ route, onNav, children }) {
               const Icon = n.icon;
               const active = route === n.key || (n.key === 'receipts' && route?.startsWith('receipt'));
               return (
-                <button key={n.key} onClick={() => onNav(n.key)} className={`rr-side-link ${active ? 'is-active' : ''}`} title={t(lang, n.labelKey)}>
+                <button key={n.key} onClick={() => onNav(n.key)} className={`rr-side-link ${active ? 'is-active' : ''}`} title={t(lang, n.labelKey)} data-testid={n.testId}>
                   <span className="rr-side-icon"><Icon size={17} /></span>
                   <span>{n.short}</span>
                   {active && <ChevronRight className="rr-side-chevron" size={13} />}
@@ -107,7 +108,7 @@ export function AppShell({ route, onNav, children }) {
         <div className="rr-mobile-nav-overlay" onClick={() => setOpen(false)}>
           <motion.nav className="rr-mobile-drawer" initial={{ x: '100%' }} animate={{ x: 0 }} onClick={(e) => e.stopPropagation()}>
             <div className="rr-drawer-head"><span>RupeeRizz</span><button onClick={() => setOpen(false)}><X size={17} /></button></div>
-            {NAV.map((n) => { const Icon = n.icon; return <button key={n.key} onClick={() => { onNav(n.key); setOpen(false); }} className={route === n.key ? 'is-active' : ''}><Icon size={17} />{t(lang, n.labelKey)}<ChevronRight size={15} /></button>; })}
+            {NAV.map((n) => { const Icon = n.icon; return <button key={n.key} onClick={() => { onNav(n.key); setOpen(false); }} className={route === n.key ? 'is-active' : ''} data-testid={n.testId}><Icon size={17} />{t(lang, n.labelKey)}<ChevronRight size={15} /></button>; })}
           </motion.nav>
         </div>
       )}
