@@ -11,7 +11,8 @@
     "start": "next start",
     "test:receipt": "node --test tests/receiptEngine.test.js",
     "test:grow": "node --test tests/growCalculators.test.js tests/growRules.test.js",
-    "benchmark:receipt": "node scripts/receiptBenchmark.mjs"
+    "benchmark:receipt": "node scripts/receiptBenchmark.mjs",
+    "test:earn-radar": "node --test tests/earnRadarRules.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "5.1.1",

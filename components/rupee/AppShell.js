@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText, Sparkles, X, Bell, ChevronRight, CircleUserRound, Sprout } from 'lucide-react';
+import { LayoutDashboard, ScanLine, PiggyBank, Target, Landmark, ShieldCheck, LogOut, Menu, Wallet, FileText, Sparkles, X, Bell, ChevronRight, CircleUserRound, Sprout, Radar } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '@/app/providers';
 import { t, LANGS } from '@/lib/i18n';
@@ -15,6 +15,7 @@ const NAV = [
   { key: 'receipts', labelKey: 'nav_scan', icon: ScanLine, short: 'Scan' },
   { key: 'plan', labelKey: 'nav_plan', icon: PiggyBank, short: 'Plan' },
   { key: 'grow', labelKey: 'nav_grow', icon: Sprout, short: 'Grow', testId: 'grow-nav-item' },
+  { key: 'earn-radar', labelKey: 'nav_earn_radar', icon: Radar, short: 'Earn', testId: 'earn-radar-nav-item' },
   { key: 'goals', labelKey: 'nav_goals', icon: Target, short: 'Goals' },
   { key: 'options', labelKey: 'nav_options', icon: Landmark, short: 'Options' },
   { key: 'my-data', labelKey: 'nav_mydata', icon: ShieldCheck, short: 'Privacy' },

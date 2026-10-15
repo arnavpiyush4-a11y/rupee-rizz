@@ -13,11 +13,71 @@ import {
   cleanOcrText, mergeVisionWithEvidence, reconcileOcrPasses, validateVisionResult,
 } from '@/lib/receiptEngine'
 import { callOpenAIJson, getOpenAIReceiptConfig, getOpenAIInsightsConfig } from '@/lib/openaiVision'
+import { searchEarnRadarOpportunities, normalizePublicHttpUrl } from '@/lib/earnRadarService.js'
+import { classifyEarnRadarStorageError, isEarnRadarDuplicateError, isSaveableEarnRadarOpportunity, sanitizeSavedCompensation } from '@/lib/earnRadarPersistence.js'
+import { EARN_RADAR_STATUSES } from '@/lib/earnRadarRules.js'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const BUCKET = 'receipts'
+function earnRadarStorageFailure(error) {
+  // Log only machine-readable error code to avoid leaking DB detail into logs/responses.
+  if (error?.code) console.warn('Earn Radar storage operation failed', { code: String(error.code).slice(0, 32) })
+  const mapped = classifyEarnRadarStorageError(error)
+  return json({ error: mapped.message, code: mapped.code }, mapped.code === 'earn_radar_storage_permission_denied' ? 403 : 503)
+}
+
+function cleanSavedOpportunity(raw) {
+  if (!isSaveableEarnRadarOpportunity(raw)) return null
+  const sourceUrl = normalizePublicHttpUrl(raw.url)
+  if (!sourceUrl) return null
+  const pick = (value, max = 400) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : ''
+  return {
+    title: pick(raw.title, 180) || 'Earning opportunity',
+    url: sourceUrl,
+    employer: pick(raw.employer, 100),
+    source: pick(raw.source, 120),
+    description: pick(raw.description, 800),
+    listingType: raw.listingType === 'individual_opportunity' ? 'individual_opportunity' : 'unconfirmed',
+    discoveryStatus: 'search_result_discovered',
+    listingStatus: raw.listingStatus === 'individual_opportunity_identified' ? 'individual_opportunity_identified' : 'unconfirmed',
+    pageExtractionStatus: ['page_text_extracted', 'extraction_unavailable_or_access_restricted'].includes(raw.pageExtractionStatus) ? raw.pageExtractionStatus : 'unknown',
+    detailsStatus: ['details_extracted_from_source_not_independently_verified', 'search_snippet_evidence_only_not_independently_verified'].includes(raw.detailsStatus) ? raw.detailsStatus : 'unknown',
+    independentlyVerified: false,
+    listingClassificationReason: pick(raw.listingClassificationReason, 300) || null,
+    advertisedCompensation: pick(raw.advertisedCompensation, 120) || null,
+    compensation: sanitizeSavedCompensation(raw.compensation),
+    location: pick(raw.location, 100),
+    workArrangement: pick(raw.workArrangement, 24),
+    requirements: pick(raw.requirements, 260) || null,
+    postingDate: pick(raw.postingDate, 40) || null,
+    applicationDeadline: pick(raw.applicationDeadline, 100) || null,
+    payoutTiming: raw.payoutTiming && typeof raw.payoutTiming === 'object' ? {
+      label: pick(raw.payoutTiming.label, 160),
+      days: Number.isFinite(raw.payoutTiming.days) ? Math.max(0, Math.min(3650, Number(raw.payoutTiming.days))) : null,
+      confidence: ['explicit', 'conditional', 'unknown'].includes(raw.payoutTiming.confidence) ? raw.payoutTiming.confidence : 'unknown',
+    } : { label: 'Not stated in the available source text', days: null, confidence: 'unknown' },
+    screening: raw.screening && typeof raw.screening === 'object' ? {
+      level: raw.screening.level === 'caution' ? 'caution' : 'no_obvious_flags',
+      flags: Array.isArray(raw.screening.flags) ? raw.screening.flags.slice(0, 8).map((v) => pick(v, 200)) : [],
+      note: 'Automated red-flag screening only; check the original source and payment terms.',
+    } : null,
+    sourceExtracted: raw.sourceExtracted === true,
+    sourceExcerpt: pick(raw.sourceExcerpt, 1500),
+    fetchedAt: pick(raw.fetchedAt, 40) || null,
+    match: raw.match && typeof raw.match === 'object' ? {
+      score: Number.isFinite(raw.match.score) ? Math.max(0, Math.min(100, Number(raw.match.score))) : 0,
+      reasons: Array.isArray(raw.match.reasons) ? raw.match.reasons.slice(0, 8).map((v) => pick(v, 220)) : [],
+      skillMatches: Array.isArray(raw.match.skillMatches) ? raw.match.skillMatches.slice(0, 12).map((v) => pick(v, 60)) : [],
+    } : { score: 0, reasons: [], skillMatches: [] },
+    feasibility: raw.feasibility && typeof raw.feasibility === 'object' ? {
+      status: ['possible_not_guaranteed', 'unlikely', 'unknown'].includes(raw.feasibility.status) ? raw.feasibility.status : 'unknown',
+      label: pick(raw.feasibility.label, 100),
+      explanation: pick(raw.feasibility.explanation, 500),
+    } : { status: 'unknown', label: 'Payment timing unknown', explanation: 'The source does not state a reliable payout date.' },
+  }
+}
 
 function cors(res) {
   res.headers.set('Access-Control-Allow-Origin', process.env.CORS_ORIGINS || '*')
@@ -140,6 +200,86 @@ async function handleRoute(request, { params }) {
     if (!auth) return json({ error: 'Not authenticated', code: 'no_auth' }, 401)
     const { supabase, user } = auth
     const uid = user.id
+
+    // ---------- EARN RADAR: live search + saved opportunity tracking ----------
+    if (route === '/earn-radar/search' && method === 'POST') {
+      if (!(await hasConsent(supabase, uid))) return json({ error: 'Consent required before using Earn Radar.', code: 'consent_required' }, 403)
+      if (!rateLimit(uid, 'earn-radar-search', 4, 10 * 60 * 1000)) return json({ error: 'You have run several searches recently. Please wait a few minutes before trying again.', code: 'rate_limited' }, 429)
+      const body = await request.json().catch(() => null)
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Enter your goal details and try again.', code: 'invalid_earn_radar_request' }, 400)
+      const { data: profileRows } = await supabase.from('profiles').select('user_type,state').eq('user_id', uid).limit(1)
+      try {
+        const result = await searchEarnRadarOpportunities({ rawRequest: body, profile: profileRows?.[0] || null })
+        return json(result)
+      } catch (error) {
+        const status = [400, 429, 502, 503].includes(error?.status) ? error.status : 502
+        const code = error?.code || (status === 429 ? 'tinyfish_rate_limited' : 'tinyfish_search_failed')
+        return json({ error: error?.message || 'Earn Radar could not complete this search. Please retry.', code }, status)
+      }
+    }
+
+    if (route === '/earn-radar/saved' && method === 'GET') {
+      if (!(await hasConsent(supabase, uid))) return json({ error: 'Consent required before using Earn Radar.', code: 'consent_required' }, 403)
+      const { data, error } = await supabase.from('earn_radar_saved').select('id,title,source_url,source,status,opportunity,notes,created_at,updated_at').eq('user_id', uid).order('updated_at', { ascending: false }).limit(100)
+      if (error) return earnRadarStorageFailure(error)
+      return json({ saved: data || [] })
+    }
+
+    if (route === '/earn-radar/saved' && method === 'POST') {
+      if (!(await hasConsent(supabase, uid))) return json({ error: 'Consent required before using Earn Radar.', code: 'consent_required' }, 403)
+      const body = await request.json().catch(() => ({}))
+      const opportunity = cleanSavedOpportunity(body?.opportunity)
+      if (!opportunity) return json({ error: 'That opportunity does not have a valid public source URL.', code: 'invalid_opportunity' }, 400)
+      const { data: existing, error: lookupError } = await supabase.from('earn_radar_saved').select('id,title,source_url,source,status,opportunity,notes,created_at,updated_at').eq('user_id', uid).eq('source_url', opportunity.url).limit(1)
+      if (lookupError) return earnRadarStorageFailure(lookupError)
+      if (existing?.[0]) return json({ saved: existing[0], alreadySaved: true })
+      const { data, error } = await supabase.from('earn_radar_saved').insert({
+        user_id: uid,
+        title: opportunity.title,
+        source_url: opportunity.url,
+        source: opportunity.source || null,
+        status: 'saved',
+        opportunity,
+      }).select('id,title,source_url,source,status,opportunity,notes,created_at,updated_at').single()
+      if (error) {
+        // A simultaneous save from another tab can win the unique(user_id, source_url)
+        // race. Return the existing record rather than treating a valid duplicate as failure.
+        if (isEarnRadarDuplicateError(error)) {
+          const { data: duplicate, error: duplicateError } = await supabase.from('earn_radar_saved')
+            .select('id,title,source_url,source,status,opportunity,notes,created_at,updated_at')
+            .eq('user_id', uid).eq('source_url', opportunity.url).limit(1)
+          if (!duplicateError && duplicate?.[0]) return json({ saved: duplicate[0], alreadySaved: true })
+          if (duplicateError) return earnRadarStorageFailure(duplicateError)
+        }
+        return earnRadarStorageFailure(error)
+      }
+      return json({ saved: data, alreadySaved: false }, 201)
+    }
+
+    if (path[0] === 'earn-radar' && path[1] === 'saved' && path.length === 3 && method === 'PUT') {
+      if (!(await hasConsent(supabase, uid))) return json({ error: 'Consent required before using Earn Radar.', code: 'consent_required' }, 403)
+      const body = await request.json().catch(() => ({}))
+      const update = {}
+      if (body?.status !== undefined) {
+        if (!EARN_RADAR_STATUSES.includes(body.status)) return json({ error: 'Choose a valid opportunity status.', code: 'invalid_status' }, 400)
+        update.status = body.status
+      }
+      if (body?.notes !== undefined) update.notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 1000) : null
+      if (!Object.keys(update).length) return json({ error: 'There is nothing to update.', code: 'empty_update' }, 400)
+      update.updated_at = new Date().toISOString()
+      const { data, error } = await supabase.from('earn_radar_saved').update(update).eq('id', path[2]).eq('user_id', uid).select('id,title,source_url,source,status,opportunity,notes,created_at,updated_at').limit(1)
+      if (error) return earnRadarStorageFailure(error)
+      if (!data?.length) return json({ error: 'Saved opportunity not found.', code: 'not_found' }, 404)
+      return json({ saved: data[0] })
+    }
+
+    if (path[0] === 'earn-radar' && path[1] === 'saved' && path.length === 3 && method === 'DELETE') {
+      if (!(await hasConsent(supabase, uid))) return json({ error: 'Consent required before using Earn Radar.', code: 'consent_required' }, 403)
+      const { data, error } = await supabase.from('earn_radar_saved').delete().eq('id', path[2]).eq('user_id', uid).select('id').limit(1)
+      if (error) return earnRadarStorageFailure(error)
+      if (!data?.length) return json({ error: 'Saved opportunity not found.', code: 'not_found' }, 404)
+      return json({ ok: true })
+    }
 
     // ---------- ME ----------
     if (route === '/me' && method === 'GET') {
@@ -560,19 +700,21 @@ async function handleRoute(request, { params }) {
 
     // ---------- MY DATA ----------
     if (route === '/my-data/export' && method === 'GET') {
-      const [{ data: profile }, { data: consents }, { data: receipts }, { data: goals }, { data: contributions }] = await Promise.all([
+      const [{ data: profile }, { data: consents }, { data: receipts }, { data: goals }, { data: contributions }, { data: earnRadarSaved }] = await Promise.all([
         supabase.from('profiles').select('*').eq('user_id', uid),
         supabase.from('consents').select('*').eq('user_id', uid),
         supabase.from('receipts').select('*').eq('user_id', uid),
         supabase.from('savings_goals').select('*').eq('user_id', uid),
         supabase.from('goal_contributions').select('*').eq('user_id', uid),
+        supabase.from('earn_radar_saved').select('*').eq('user_id', uid),
       ])
-      return json({ export: { user: { id: uid, email: user.email }, profile: profile?.[0] || null, consents: consents || [], receipts: receipts || [], goals: goals || [], contributions: contributions || [], exported_at: new Date().toISOString() } })
+      return json({ export: { user: { id: uid, email: user.email }, profile: profile?.[0] || null, consents: consents || [], receipts: receipts || [], goals: goals || [], contributions: contributions || [], earn_radar_saved: earnRadarSaved || [], exported_at: new Date().toISOString() } })
     }
     if (route === '/my-data/delete' && method === 'POST') {
       const { data: receipts } = await supabase.from('receipts').select('image_path').eq('user_id', uid)
       const paths = (receipts || []).map((r) => r.image_path).filter(Boolean)
       if (paths.length) { try { await supabase.storage.from(BUCKET).remove(paths) } catch (e) {} }
+      await supabase.from('earn_radar_saved').delete().eq('user_id', uid)
       await supabase.from('goal_contributions').delete().eq('user_id', uid)
       await supabase.from('savings_goals').delete().eq('user_id', uid)
       await supabase.from('receipts').delete().eq('user_id', uid)
