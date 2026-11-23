@@ -21,9 +21,11 @@ import { RizzSplash } from '@/components/rupee/RizzSplash';
 import { GrowSavingsView } from '@/components/rupee/views/GrowSavingsView';
 import { EarnRadarView } from '@/components/rupee/views/EarnRadarView';
 
-const PUBLIC = ['landing', 'auth'];
+import { BusinessDesk } from '@/components/rupee/views/BusinessDesk';
+
+const PUBLIC = ['landing', 'auth','business-demo'];
 const PREAPP = ['landing', 'auth', 'consent', 'onboarding'];
-const APP_ROUTES = ['dashboard', 'receipts', 'plan', 'goals', 'financial-health', 'options', 'before-you-borrow', 'my-data', 'report', 'money-lab', 'grow', 'earn-radar'];
+const APP_ROUTES = ['business','dashboard', 'receipts', 'plan', 'goals', 'financial-health', 'options', 'before-you-borrow', 'my-data', 'report', 'money-lab', 'grow', 'earn-radar'];
 
 function FullLoader() {
   return <RizzSplash label="Waking up your money universe…" />;
@@ -45,8 +47,9 @@ function App() {
   if (!ready) return <FullLoader />;
 
   if (!uid) {
+    if (route === 'business-demo') return <BusinessDesk demo onNav={() => nav('landing')} />;
     if (route === 'auth') return <AuthView onBack={() => nav('landing')} onDone={() => {}} />;
-    return <Landing onGetStarted={() => nav('auth')} onDemo={() => nav('auth')} />;
+    return <Landing onGetStarted={() => nav('auth')} onDemo={() => nav('business-demo')} />;
   }
 
   if (!consent?.active) return <ConsentView onAgreed={() => {}} />;
@@ -55,6 +58,7 @@ function App() {
   const current = APP_ROUTES.includes(route) ? route : 'dashboard';
   return (
     <AppShell route={current} onNav={nav}>
+      {current === 'business' && profile.user_type === 'micro_entrepreneur' && <BusinessDesk key={uid} onNav={nav} />}
       {current === 'dashboard' && <Dashboard onNav={nav} />}
       {current === 'receipts' && <ReceiptsView />}
       {current === 'plan' && <PlanView onNav={nav} />}

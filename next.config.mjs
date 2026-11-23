@@ -1,5 +1,8 @@
 const nextConfig = {
+  distDir: process.env.RR_BUILD_DIST_DIR || '.next',
   output: 'standalone',
+  outputFileTracingRoot: process.cwd(),
+  outputFileTracingIncludes: { '/api/**': ['./models/ocr/best/*'] },
   images: {
     unoptimized: true,
     remotePatterns: [

@@ -20,31 +20,7 @@ export function ReceiptUploader({ onScan, scanning }) {
     if (!ALLOWED.includes(file.type)) { setError('Please choose a JPG, PNG or WebP image.'); return; }
     if (file.size > MAX) { setError('Image must be under 10 MB.'); return; }
     const reader = new FileReader();
-    reader.onload = () => {
-      // Keep the browser transformation intentionally light. The server now performs
-      // rotation, resizing, grayscale, normalization and sharpening with Sharp, so we
-      // don't destroy receipt detail in the browser before OCR sees it.
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const maxDim = 2800;
-          const currentMax = Math.max(img.width, img.height);
-          const scale = currentMax > maxDim ? maxDim / currentMax : 1;
-          const w = Math.max(1, Math.round(img.width * scale));
-          const h = Math.max(1, Math.round(img.height * scale));
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          setPreview(canvas.toDataURL('image/jpeg', 0.94));
-        } catch (e) {
-          setPreview(reader.result);
-        }
-      };
-      img.onerror = () => setPreview(reader.result);
-      img.src = reader.result;
-    };
+    reader.onload = () => setPreview(reader.result);
     reader.readAsDataURL(file);
   };
 

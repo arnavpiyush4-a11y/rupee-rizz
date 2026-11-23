@@ -26,50 +26,11 @@ Built for Smart India Hackathon. This is **not** a loan-approval / credit-underw
 
 - **Next.js (App Router)** + **Tailwind** + **shadcn/ui** + **Recharts** + **lucide-react**.
 - **Supabase** for Postgres data, Auth, Storage and Row Level Security.
-- **Direct OpenAI Responses API** for primary multimodal receipt extraction, with strict JSON Schema + OCR evidence fusion; **Emergent Universal LLM** remains an optional server-side fallback.
+- **Native Tesseract 5 and Sharp** for local document recognition. The separate financial-insights feature retains its optional LLM integration.
 
-### Receipt intelligence pipeline (v5)
+### Independent receipt and business document OCR
 
-RupeeRizz now treats receipt extraction as an evidence-fusion problem instead of trusting one OCR result.
-
-1. The server assesses image quality (resolution, contrast, sharpness and glare) before extraction.
-2. The image is preprocessed server-side and OCR.space can run two passes: original + enhanced image.
-3. Each OCR pass is parsed independently. Totals, dates and merchant names are reconciled rather than concatenated.
-4. Direct OpenAI vision is the primary multimodal LLM path when `OPENAI_API_KEY` is configured. The image is the primary evidence and OCR is corroboration.
-5. Strict JSON Schema output reduces extraction drift.
-6. A second vision arbitration pass can resolve genuine conflicts by re-reading the receipt; it must return `null` + verification when the image is ambiguous rather than guessing.
-7. Arithmetic validation checks item totals, labelled tax/discount lines and payment/tender amounts against the proposed grand total.
-8. Low-quality images and disputed fields stay editable and require user verification before the receipt is saved.
-9. Emergent remains an optional fallback provider. The system never silently falls back to demo values in live mode.
-
-### Runtime configuration
-
-```env
-OPENAI_API_KEY=...
-OPENAI_RECEIPT_MODEL=gpt-5.6-sol
-OPENAI_RECEIPT_FALLBACK_MODEL=gpt-5.6-luna
-OPENAI_RECEIPT_ARBITER_MODEL=gpt-5.6-sol
-OPENAI_REASONING_EFFORT=high
-OPENAI_RECEIPT_MAX_OUTPUT_TOKENS=1800
-OPENAI_INSIGHTS_MODEL=gpt-5.6-luna
-OPENAI_INSIGHTS_FALLBACK_MODEL=gpt-5.6-luna
-OPENAI_INSIGHTS_REASONING=low
-OPENAI_INSIGHTS_MAX_OUTPUT_TOKENS=700
-OPENAI_TIMEOUT_MS=60000
-OCR_MODE=live
-OCR_PROVIDER=ocrspace
-OCR_API_KEY=...
-```
-
-Optional fallback:
-
-```env
-EMERGENT_LLM_KEY=...
-```
-
-Supabase requires the project URL plus the publishable key (or the supported legacy anon-key alias). This app does **not** require a Supabase service-role/secret key.
-
-OpenAI API usage is billed separately from a ChatGPT subscription. Keep `OPENAI_API_KEY` server-side only; never expose it in client code or source control.
+Receipt images run through local Sharp preprocessing, native Tesseract and deterministic extraction. The review screen links an owner-confirmed document to its private source. Follow [installation, evaluation and demo instructions](docs/ocr/README.md).
 
 ### API and security
 
@@ -82,56 +43,17 @@ OpenAI API usage is billed separately from a ChatGPT subscription. Keep `OPENAI_
 The app reads/writes the Supabase tables used by the current schema, including `profiles`, `consents`, `receipts`, `savings_goals`, `goal_contributions`, and `deletion_requests`, plus the private `receipts` Storage bucket.
 
 ### Security & privacy model
-- Every user route requires `Authorization: Bearer <user_id>` and filters by that `user_id`.
+- Every user route requires `Authorization: Bearer <Supabase access token>` and filters by that `user_id`.
 - Consent is required (HTTP 403 `consent_required`) before OCR, receipts, dashboard analysis, insights, or Before-You-Borrow.
-- Receipt text is masked for phone numbers, UPI IDs and card-like numbers **before storage**.
-- Never collected/used: caste, religion, gender, political views, Aadhaar, card numbers, PINs, passwords, bank logins.
-- The financial-insight LLM receives **only verified, server-computed values** and cannot change goals/plans/scores. The receipt vision LLM receives the consented receipt image(s) plus OCR evidence only for extraction; it cannot write goals, plans, scores, or account data.
+- Extracted merchant and item text passes through sensitive-data masking. The original image is stored privately as uploaded.
+- The ledger does not request account passwords, PINs or Aadhaar numbers.
+- The financial-insight LLM receives **only verified, server-computed values** and cannot change goals/plans/scores. Receipt images are processed locally on the application host.
 
 ---
 
 ## Run locally
 
-```bash
-yarn install
-cp .env.example .env      # fill in values (see below)
-yarn dev                  # or: sudo supervisorctl restart nextjs
-```
-
-Open the app, click **Try demo safely** → start as **Arnav** (student) or **Priya** (micro-entrepreneur)
-for a fully seeded, working dashboard. Or **Continue with email** for a fresh account
-(→ consent → onboarding → dashboard).
-
-### Environment variables
-| Key | Purpose |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable/anon client key |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Legacy alias supported by the app |
-| `OPENAI_API_KEY` | Direct OpenAI API key for primary multimodal AI |
-| `OPENAI_RECEIPT_*`, `OPENAI_INSIGHTS_*` | OpenAI model, fallback, reasoning, timeout and output settings |
-| `EMERGENT_LLM_KEY` | Optional Emergent fallback key |
-| `OCR_MODE` | `live` (default) or `demo`; demo must be explicitly enabled |
-| `OCR_PROVIDER`, `OCR_API_KEY` | Live OCR via OCR.space; provider defaults to `ocrspace` when a key is present |
-
----
-
-## Demo mode & OCR
-
-- **Demo OCR** returns realistic, deterministic sample receipts (clearly labelled) so the full
-  **upload → scan → extract → verify → save** flow works with no keys.
-- **Enhanced OCR:** the real scanner uses OCR.space Engine 2 with language autodetection, orientation detection, provider scaling, two passes (original + server-preprocessed image), strict amount/date/merchant heuristics, and LLM structuring with OCR evidence checks. `OCR_MODE=live` is the default.
-- **Important:** if `OCR_API_KEY` is missing while `OCR_MODE=live`, the API now fails safely with a verification-required response instead of returning canned demo values. This prevents fake-looking OCR results from leaking into real uploads.
-- To force demo OCR only, set `OCR_MODE=demo`.
-- For **live OCR**, set `OCR_MODE=live` and `OCR_API_KEY` (provider defaults to OCR.space). The backend OCR adapter is already implemented; no UI changes are needed.
-
-## Enabling Google sign-in later (optional)
-
-Google OAuth needs an auth provider (e.g. Supabase). To add it: configure a Supabase project, set the
-Google provider redirect URL to `<NEXT_PUBLIC_BASE_URL>/auth/callback`, and swap the demo-safe session for
-Supabase Auth. The current build ships a working demo-safe session instead so the MVP runs with zero external setup.
-
----
+Install the native dependencies and configure the Supabase public credentials and server-only scan signing key as described in [the OCR guide](docs/ocr/README.md). Run `npm ci --legacy-peer-deps` followed by `npm run dev`. The landing page offers the business demonstration.
 
 ## Key files
 
@@ -154,27 +76,10 @@ components/rupee/views/*             # Landing, Auth, Consent, Onboarding, Dashb
 ## For guidance only
 RupeeRizz is for financial guidance only. Always verify scheme and lender conditions from official sources.
 
-## Receipt AI provider
+## Hack With Delhi 4.0 · Business workspace
 
-RupeeRizz can use the direct OpenAI API as the primary multimodal receipt engine. The app sends the receipt image to an OpenAI vision model and combines that result with two independent OCR.space passes when `OCR_API_KEY` is configured. Conflicts can trigger a second vision arbitration pass. Emergent remains an optional fallback.
+Apply migrations 0001 through 0004 in order before serving this branch. The existing Supabase environment variables and receipt scanner are reused. Sign in with a consented micro-entrepreneur profile and open **Business**.
 
-Set `OPENAI_API_KEY` in `.env.local`. ChatGPT subscription billing and OpenAI API billing are separate; API usage requires API billing/credits on the API platform.
+For an isolated walkthrough, choose **See the demo** on the landing page. The sample shop bought ten rice bags for ₹500 and sold two on credit for ₹160. Open **Stock & suppliers** to see eight bags left. In **Ledger**, link the ₹160 sample receipt to the sale, then settle it digitally. The receivable clears while operating profit stays at ₹60. Open **Evidence Passport** to see coverage rise from 50% to 100%, export JSON, and compare the file with the ledger. Demo edits last until you exit or reload. Live accounts start with their own records.
 
-### Receipt verification commands
-
-```bash
-npm run test:receipt
-npm run benchmark:receipt
-```
-
-
-## Receipt AI v6 notes
-
-RupeeRizz now treats receipt extraction as an evidence-fusion problem rather than trusting one parser. The final receipt values are cross-checked across OCR passes, multimodal vision extraction and arithmetic. The app will explicitly label OCR-only fallback mode and require verification instead of presenting it as a verified AI result.
-
-Run the local receipt checks with:
-
-```bash
-npm run test:receipt
-npm run benchmark:receipt
-```
+Monetary calculations use paise. GST is entered by the operator. Passports report the strength of recorded evidence and do not determine loan or scheme eligibility. Run the regression suite with `node --test tests/*.test.js`.

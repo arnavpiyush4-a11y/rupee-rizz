@@ -1,0 +1,74 @@
+[
+  {
+    "file": "credit.json",
+    "expected": null,
+    "read": null,
+    "ms": 1173
+  },
+  {
+    "file": "digital.json",
+    "expected": 250,
+    "read": 250,
+    "ms": 241
+  },
+  {
+    "file": "gst.json",
+    "expected": null,
+    "read": 198,
+    "ms": 281
+  },
+  {
+    "file": "gstbill.json",
+    "expected": 10000,
+    "read": 10000,
+    "ms": 228
+  },
+  {
+    "file": "retail.json",
+    "expected": null,
+    "read": 123.45,
+    "ms": 363
+  },
+  {
+    "file": "return.json",
+    "expected": null,
+    "read": null,
+    "ms": 973
+  },
+  {
+    "file": "service.json",
+    "expected": 1250,
+    "read": 1250,
+    "ms": 290
+  },
+  {
+    "file": "split.json",
+    "expected": null,
+    "read": null,
+    "ms": 1055
+  },
+  {
+    "file": "stock.json",
+    "expected": null,
+    "read": null,
+    "ms": 1000
+  },
+  {
+    "file": "supplier.json",
+    "expected": 123456.78,
+    "read": null,
+    "ms": 1105
+  },
+  {
+    "file": "transcription.json",
+    "expected": null,
+    "read": 9120,
+    "ms": 356
+  },
+  {
+    "file": "vendor.json",
+    "expected": 250,
+    "read": null,
+    "ms": 1338
+  }
+]

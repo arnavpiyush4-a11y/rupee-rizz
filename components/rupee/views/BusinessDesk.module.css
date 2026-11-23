@@ -1,0 +1,144 @@
+.desk {
+  width: min(100%, 1050px);
+  margin: 0 auto;
+  padding: clamp(14px, 3vw, 32px);
+  color: #e9f5f2;
+  background: #102125;
+  border-radius: 20px;
+  line-height: 1.5;
+}
+.hero,
+.row,
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hero,
+.row {
+  justify-content: space-between;
+}
+.hero small,
+.metrics small {
+  color: #9dd8c9;
+}
+.hero h1 {
+  font-size: clamp(30px, 5vw, 55px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+.desk p {
+  margin: 8px 0;
+  color: #bfd2d0;
+}
+.tabs {
+  margin: 18px 0;
+}
+.desk button,
+.desk select,
+.desk input {
+  border: 1px solid #627b78;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #172f32;
+  color: #f2faf9;
+  font: inherit;
+}
+.desk button:hover,
+.desk button:focus-visible {
+  border-color: #a9f0db;
+}
+.desk button:disabled {
+  opacity: 0.55;
+}
+.desk .primary,
+.tabs button[aria-pressed='true'] {
+  background: #b0ecd9;
+  color: #153e34;
+}
+.metrics,
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+  gap: 12px;
+}
+.metrics article,
+.panel {
+  background: #193034;
+  border: 1px solid #365353;
+  border-radius: 14px;
+  padding: 18px;
+}
+.metrics strong,
+.row small,
+.field span {
+  display: block;
+}
+.metrics strong {
+  font-size: 1.35rem;
+}
+.panel {
+  margin-top: 16px;
+}
+.panel h2 {
+  font-size: 1.45rem;
+  font-weight: 650;
+  margin: 8px 0;
+}
+.panel h3 {
+  font-weight: 650;
+  margin-top: 15px;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  margin: 7px 0;
+  min-width: 0;
+}
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+}
+.row,
+.panel details {
+  padding: 12px 0;
+  border-bottom: 1px solid #365353;
+}
+.row small,
+.field span {
+  font-size: 0.86rem;
+  color: #bfd2d0;
+}
+.panel summary {
+  cursor: pointer;
+}
+.panel button {
+  margin: 8px 0;
+}
+.desk :focus-visible {
+  outline: 2px solid #a9f0db;
+  outline-offset: 2px;
+}
+@media print {
+  .desk,
+  .desk * {
+    visibility: visible;
+  }
+  .desk {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    color: black;
+    background: white;
+  }
+  .desk * {
+    color: black !important;
+    background: white !important;
+  }
+  .desk button,
+  .tabs {
+    display: none;
+  }
+}
