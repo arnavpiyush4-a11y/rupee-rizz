@@ -26,6 +26,7 @@ node_modules/
 /out/
 next-env.d.ts
 *.tsbuildinfo
+container-public-config.json
 
 # Production builds
 /build

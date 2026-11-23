@@ -32,6 +32,8 @@ Built for Smart India Hackathon. This is **not** a loan-approval / credit-underw
 
 Receipt images run through local Sharp preprocessing, native Tesseract and deterministic extraction. The review screen links an owner-confirmed document to its private source. Follow [installation, evaluation and demo instructions](docs/ocr/README.md).
 
+For Vercel Preview deployment, use the [Container Functions deployment guide](docs/ocr/vercel-container.md). The included `Dockerfile.vercel` packages native OCR with the full app.
+
 ### API and security
 
 - Single catch-all API at `app/api/[[...path]]/route.js`.

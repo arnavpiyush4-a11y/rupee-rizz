@@ -21,6 +21,8 @@ For the **synthetic judge demo only**, the app can build and render using `https
 
 ## Deployment and engine choices
 
+For Vercel, follow the [Container Functions deployment guide](vercel-container.md). `Dockerfile.vercel` takes precedence over ordinary Next.js detection and includes the existing native OCR engine.
+
 Deploy the whole Next.js app on a Linux host or container with the native executable and language packs. An ordinary Vercel deployment does not provision them. The included Dockerfile builds the Next standalone server. Supply the two public Supabase variables as build arguments and pass the same values plus the signing key at runtime. Example from a shell with these variables set:
 
 ```bash
