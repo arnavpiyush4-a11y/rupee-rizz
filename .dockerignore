@@ -1,5 +1,6 @@
 .git
 .next*
+container-public-config.json
 **/node_modules
 .env*
 **/.env*

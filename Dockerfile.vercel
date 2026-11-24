@@ -9,12 +9,9 @@ COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 COPY . .
 RUN bash scripts/ocr/best-english.sh models/ocr/best
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Public Supabase settings and private keys are validated at runtime, never baked in.
 ENV RR_BUILD_DIST_DIR=.next NEXT_TELEMETRY_DISABLED=1
-RUN node scripts/deploy/build-public-config.mjs && npm run build
+RUN npm run build
 
 # Test-only target: never shipped, accepts private images by read-only mount.
 FROM build AS verification
@@ -27,8 +24,8 @@ COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/models/ocr ./models/ocr
-COPY --from=build --chown=node:node /app/container-public-config.json ./container-public-config.json
-COPY --chown=node:node scripts/deploy ./scripts/deploy
+COPY --chown=node:node scripts/deploy/public-config.mjs scripts/deploy/start-container.mjs scripts/deploy/verify-ocr.mjs ./scripts/deploy/
+COPY --chown=node:node lib/supabase/public-config.js ./lib/supabase/public-config.js
 RUN node scripts/deploy/verify-ocr.mjs
 USER node
 EXPOSE 80

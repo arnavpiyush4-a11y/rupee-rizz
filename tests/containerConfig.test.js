@@ -2,31 +2,37 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { publicConfig, runtimeConfig } from '../scripts/deploy/public-config.mjs';
 
-const built = publicConfig({ NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'public-fixture' });
-const runtime = { RR_OCR_SIGNING_KEY: 'fixture-key-at-least-32-characters-long' };
+const publicEnv = { NEXT_PUBLIC_SUPABASE_URL: 'https://fixture.supabase.co', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' };
+const runtime = { ...publicEnv, RR_OCR_SIGNING_KEY: 'fixture-key-at-least-32-characters-long' };
+const jwt = (role) => `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ role })).toString('base64url')}.fixture`;
 
-test('container build requires public Supabase settings and supports legacy anon configuration', () => {
-  assert.throws(() => publicConfig({}), /before building/);
-  assert.equal(publicConfig({ NEXT_PUBLIC_SUPABASE_URL: built.url, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon' }).keyVariable, 'NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  assert.throws(() => publicConfig({ NEXT_PUBLIC_SUPABASE_URL: 'file:///private', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'x' }), /HTTP/);
+test('public runtime config requires settings, supports legacy anon and exposes only an allowlist', () => {
+  assert.throws(() => publicConfig({}), /runtime environment/);
+  assert.throws(() => publicConfig({ NEXT_PUBLIC_SUPABASE_URL: publicEnv.NEXT_PUBLIC_SUPABASE_URL }), /runtime environment/);
+  assert.deepEqual(publicConfig(runtime), { url: publicEnv.NEXT_PUBLIC_SUPABASE_URL, key: publicEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY });
+  assert.equal(publicConfig({ NEXT_PUBLIC_SUPABASE_URL: publicEnv.NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt('anon') }).key, jwt('anon'));
+  assert.equal(publicConfig({ ...runtime, NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt('anon') }).key, publicEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  assert.deepEqual(publicConfig({ NEXT_PUBLIC_SUPABASE_URL: ` ${publicEnv.NEXT_PUBLIC_SUPABASE_URL}\n`, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ` ${publicEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}\n` }), publicConfig(publicEnv));
 });
-test('container build rejects service-role and secret keys from browser configuration', () => {
-  for (const key of ['sb_secret_fixture', `a.${Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url')}.z`])
-    assert.throws(() => publicConfig({ NEXT_PUBLIC_SUPABASE_URL: built.url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: key }), /private Supabase/);
+test('public runtime config rejects private, malformed and placeholder keys without echoing values', () => {
+  for (const key of ['sb_secret_fixture', ' sb_secret_fixture\n', jwt('service_role'), ` ${jwt('service_role')} `, jwt('authenticated'), 'example-key', '   ']) {
+    assert.throws(() => publicConfig({ ...publicEnv, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: key }), (error) => {
+      assert.ok(!error.message.includes(key.trim()) || !key.trim());
+      return /Supabase|runtime environment/.test(error.message);
+    });
+  }
+  for (const url of ['file:///private', 'not-a-url', 'https://user:private@fixture.supabase.co'])
+    assert.throws(() => publicConfig({ ...publicEnv, NEXT_PUBLIC_SUPABASE_URL: url }), /HTTP/);
 });
-test('container startup requires the same signing-key rule as receipt provenance', () => {
-  for (const key of [undefined, '', 'short']) assert.throws(() => runtimeConfig({ RR_OCR_SIGNING_KEY: key }, built), /RR_OCR_SIGNING_KEY/);
-  assert.equal(runtimeConfig(runtime, built).RR_OCR_SIGNING_KEY, runtime.RR_OCR_SIGNING_KEY);
+test('container startup requires the receipt signing key and runtime public settings', () => {
+  for (const key of [undefined, '', 'short']) assert.throws(() => runtimeConfig({ ...runtime, RR_OCR_SIGNING_KEY: key }), /RR_OCR_SIGNING_KEY/);
+  assert.throws(() => runtimeConfig({ RR_OCR_SIGNING_KEY: runtime.RR_OCR_SIGNING_KEY }), /runtime environment/);
+  assert.equal(runtimeConfig(runtime).RR_OCR_SIGNING_KEY, runtime.RR_OCR_SIGNING_KEY);
 });
-test('container binds all interfaces on the routed port and restores only baked public values', () => {
-  assert.equal(runtimeConfig(runtime, built).PORT, '80');
-  const config = runtimeConfig({ ...runtime, PORT: '8080', HOSTNAME: 'container-id' }, built);
+test('container binds all interfaces on the routed port with deployment-specific public values', () => {
+  assert.equal(runtimeConfig(runtime).PORT, '80');
+  const config = runtimeConfig({ ...runtime, PORT: '8080', HOSTNAME: 'container-id', NEXT_PUBLIC_SUPABASE_URL: 'https://another.supabase.co' });
   assert.equal(config.PORT, '8080'); assert.equal(config.HOSTNAME, '0.0.0.0');
-  assert.equal(config.NEXT_PUBLIC_SUPABASE_URL, built.url);
-  assert.equal(config.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, built.key);
-  for (const port of ['0', '65536', '-1', 'not-a-port']) assert.throws(() => runtimeConfig({ ...runtime, PORT: port }, built), /PORT/);
-});
-test('container cannot silently switch the runtime Supabase project under a baked browser build', () => {
-  assert.throws(() => runtimeConfig({ ...runtime, NEXT_PUBLIC_SUPABASE_URL: 'https://other.supabase.co' }, built), /Rebuild/);
-  assert.throws(() => runtimeConfig({ ...runtime, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'other' }, built), /Rebuild/);
+  assert.equal(config.NEXT_PUBLIC_SUPABASE_URL, 'https://another.supabase.co');
+  for (const port of ['0', '65536', '-1', 'not-a-port']) assert.throws(() => runtimeConfig({ ...runtime, PORT: port }), /PORT/);
 });

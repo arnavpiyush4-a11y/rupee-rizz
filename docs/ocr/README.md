@@ -17,16 +17,16 @@ openssl rand -hex 32
 
 Set the generated value as the server-only `RR_OCR_SIGNING_KEY`. Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for your project. Apply unapplied migrations under `supabase/migrations` in numeric order, through **0004_document_intelligence.sql**. Keep existing private keys out of Git. Start the app with `npm run dev`, then open http://localhost:3000.
 
-For the **synthetic judge demo only**, the app can build and render using `https://example.supabase.co` and `placeholder` as the public URL and publishable key. Select **See the demo → Scan sample with local OCR**. Review the ₹44 invoice and its two rice units, confirm INR, then save. Select the receipt under **Receipt evidence**, choose **purchase**, enable **Post reviewed inventory lines** and save. Open **Stock & suppliers** and **Evidence Passport**. The original invoice PNG is bundled. The application processes it with Tesseract on first use per server process. Demo records stay in page memory. Live account scans require active consent and the signing key.
+With the actual public Supabase configuration set for the running app, select **See the demo → Scan sample with local OCR** for the **synthetic judge demo**. Review the ₹44 invoice and its two rice units, confirm INR, then save. Select the receipt under **Receipt evidence**, choose **purchase**, enable **Post reviewed inventory lines** and save. Open **Stock & suppliers** and **Evidence Passport**. The original invoice PNG is bundled. The application processes it with Tesseract on first use per server process. Demo records stay in page memory. Live account scans require active consent and the signing key. Production startup has no placeholder credentials; synthetic configuration is limited to isolated verification scripts.
 
 ## Deployment and engine choices
 
 For Vercel, follow the [Container Functions deployment guide](vercel-container.md). `Dockerfile.vercel` takes precedence over ordinary Next.js detection and includes the existing native OCR engine.
 
-Deploy the whole Next.js app on a Linux host or container with the native executable and language packs. An ordinary Vercel deployment does not provision them. The included Dockerfile builds the Next standalone server. Supply the two public Supabase variables as build arguments and pass the same values plus the signing key at runtime. Example from a shell with these variables set:
+Deploy the whole Next.js app on a Linux host or container with the native executable and language packs. An ordinary Vercel deployment does not provision them. The included Dockerfiles build the Next standalone server without Supabase credentials or build arguments. Supply the actual two public Supabase values and the signing key at runtime. The dynamic application layout passes only the validated public URL/key to the browser during hydration; the server's authenticated request client uses the same runtime resolver. Example from a shell with the actual deployment values set:
 
 ```bash
-docker build --build-arg NEXT_PUBLIC_SUPABASE_URL --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY -t rupeerizz .
+docker build --platform linux/amd64 -t rupeerizz .
 docker run --rm -p 3000:3000 -e NEXT_PUBLIC_SUPABASE_URL -e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY -e RR_OCR_SIGNING_KEY rupeerizz
 ```
 
@@ -55,7 +55,7 @@ node scripts/ocr/verification/check-database.mjs
 node scripts/ocr/verification/check-workflow.mjs
 ```
 
-The optional verification harness uses Node 24, PGlite for PostgreSQL and jsdom for component interaction. It invokes the real OCR route for the public demo and exercises identity/consent checks using isolated database roles. It does not use live Supabase credentials. The production build needs the two public environment variables.
+The optional verification harness uses Node 24, PGlite for PostgreSQL and jsdom for component interaction. It invokes the real OCR route for the public demo and exercises identity/consent checks using isolated database roles. It does not use live Supabase credentials. The production image builds without the public environment variables; running the application requires their actual deployment values. The [Container guide](vercel-container.md) distinguishes current verification from historical results and describes the isolated two-configuration image check.
 
 The generator writes three training documents plus line-image/transcription pairs, two validation documents, eight development-test documents and eight final unseen documents. Vendors are disjoint across splits. Held-out fixtures change header order, merchant names and amounts but share the generator's typography. They include rotated, blurred, low-contrast and incomplete cases. Hindi and Odia samples contain a local-script total label embedded in English text. These samples do not establish reliability for full Indic-script invoices or handwriting.
 
