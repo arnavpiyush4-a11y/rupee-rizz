@@ -9,7 +9,7 @@
     "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start",
-    "test:receipt": "node --test tests/receiptEngine.test.js",
+    "test:receipt": "node --test tests/receiptEngine.test.js tests/receiptLayout.test.js tests/receiptArithmetic.test.js tests/receiptCells.test.js tests/ocrEvidence.test.js",
     "test:grow": "node --test tests/growCalculators.test.js tests/growRules.test.js",
     "benchmark:receipt": "node scripts/receiptBenchmark.mjs",
     "test:earn-radar": "node --test tests/earnRadarRules.test.js"

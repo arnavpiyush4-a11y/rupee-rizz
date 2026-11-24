@@ -36,6 +36,7 @@ export function LanguageToggle() {
 export function AppShell({ route, onNav, children }) {
   const { lang, user, profile, logout } = useApp();
   const [open, setOpen] = useState(false);
+  const nav = profile?.user_type === 'micro_entrepreneur' ? [NAV[0], {key:'business',short:'Business',icon:Wallet}, ...NAV.slice(1)] : NAV;
   const initials = (profile?.full_name || user?.name || 'U').slice(0, 1).toUpperCase();
   const typeLabel = profile?.user_type === 'micro_entrepreneur' ? t(lang, 'micro_ent') : t(lang, 'student');
 
@@ -51,7 +52,7 @@ export function AppShell({ route, onNav, children }) {
 
         <div className="rr-header-center">
           <span className="rr-live-pill"><span /> your money space</span>
-          <span className="rr-header-route">{NAV.find((n) => n.key === route)?.short || 'Dashboard'}</span>
+          <span className="rr-header-route">{nav.find((n) => n.key === route)?.short || 'Dashboard'}</span>
         </div>
 
         <div className="rr-app-header-actions">
@@ -80,11 +81,11 @@ export function AppShell({ route, onNav, children }) {
         <aside className="rr-side-rail">
           <div className="rr-side-rail-label">move around</div>
           <nav>
-            {NAV.map((n) => {
+            {nav.map((n) => {
               const Icon = n.icon;
               const active = route === n.key || (n.key === 'receipts' && route?.startsWith('receipt'));
               return (
-                <button key={n.key} onClick={() => onNav(n.key)} className={`rr-side-link ${active ? 'is-active' : ''}`} title={t(lang, n.labelKey)} data-testid={n.testId}>
+                <button key={n.key} onClick={() => onNav(n.key)} className={`rr-side-link ${active ? 'is-active' : ''}`} title={(n.labelKey ? t(lang, n.labelKey) : n.short)} data-testid={n.testId}>
                   <span className="rr-side-icon"><Icon size={17} /></span>
                   <span>{n.short}</span>
                   {active && <ChevronRight className="rr-side-chevron" size={13} />}
@@ -109,7 +110,7 @@ export function AppShell({ route, onNav, children }) {
         <div className="rr-mobile-nav-overlay" onClick={() => setOpen(false)}>
           <motion.nav className="rr-mobile-drawer" initial={{ x: '100%' }} animate={{ x: 0 }} onClick={(e) => e.stopPropagation()}>
             <div className="rr-drawer-head"><span>RupeeRizz</span><button onClick={() => setOpen(false)}><X size={17} /></button></div>
-            {NAV.map((n) => { const Icon = n.icon; return <button key={n.key} onClick={() => { onNav(n.key); setOpen(false); }} className={route === n.key ? 'is-active' : ''} data-testid={n.testId}><Icon size={17} />{t(lang, n.labelKey)}<ChevronRight size={15} /></button>; })}
+            {nav.map((n) => { const Icon = n.icon; return <button key={n.key} onClick={() => { onNav(n.key); setOpen(false); }} className={route === n.key ? 'is-active' : ''} data-testid={n.testId}><Icon size={17} />{(n.labelKey ? t(lang, n.labelKey) : n.short)}<ChevronRight size={15} /></button>; })}
           </motion.nav>
         </div>
       )}

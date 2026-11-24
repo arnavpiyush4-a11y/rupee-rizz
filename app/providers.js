@@ -15,8 +15,8 @@ const queryClient = new QueryClient({
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-export function Providers({ children }) {
-  const supabase = getBrowserSupabase();
+export function Providers({ children, supabaseConfig }) {
+  const supabase = getBrowserSupabase(supabaseConfig);
   const [lang, setLangState] = useState('en');
   const [uid, setUid] = useState(null);
   const [user, setUser] = useState(null);

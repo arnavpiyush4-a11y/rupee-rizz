@@ -1,0 +1,218 @@
+[
+  {
+    "file": "0.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 260
+  },
+  {
+    "file": "0.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 452
+  },
+  {
+    "file": "1.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": false,
+      "date": false,
+      "total": false,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 0,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 635
+  },
+  {
+    "file": "1.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 781
+  },
+  {
+    "file": "2.json",
+    "language": "hi",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": false,
+      "total": false,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 472
+  },
+  {
+    "file": "2.json",
+    "language": "hi",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 380
+  },
+  {
+    "file": "3.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 301
+  },
+  {
+    "file": "3.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 614
+  },
+  {
+    "file": "4.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 338
+  },
+  {
+    "file": "4.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 444
+  },
+  {
+    "file": "5.json",
+    "language": "hi",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": false,
+      "total": false,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 373
+  },
+  {
+    "file": "5.json",
+    "language": "hi",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 425
+  }
+]

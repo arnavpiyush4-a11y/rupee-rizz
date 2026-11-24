@@ -5,6 +5,7 @@
 .vscode/
 
 # Dependencies
+/models/ocr/
 node_modules/
 /node_modules
 /.pnp
@@ -21,9 +22,11 @@ node_modules/
 
 # Next.js
 /.next/
+/.next-ocr-check/
 /out/
 next-env.d.ts
 *.tsbuildinfo
+container-public-config.json
 
 # Production builds
 /build

@@ -1,0 +1,1 @@
+{"private":true,"type":"module","devDependencies":{"@electric-sql/pglite":"0.5.17","esbuild":"0.28.2","jsdom":"31.0.1"}}

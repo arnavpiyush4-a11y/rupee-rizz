@@ -1,6 +1,12 @@
+import { reviewedBusiness } from '@/lib/ocr/review'
+import { ownedRows } from '@/lib/businessStore'
+import { today } from '@/lib/business'
 import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
-import sharp from 'sharp'
+import { recognize } from '@/lib/ocr/recognize'
+import { readFile } from 'node:fs/promises'
+import pathModule from 'node:path'
+import { digest, seal, unseal } from '@/lib/ocr/provenance'
 import { createRequestClient } from '@/lib/supabase/request'
 import {
   computeSnapshot, emergencyFundTarget, goalMetrics, requiredMonthly,
@@ -8,11 +14,8 @@ import {
 } from '@/lib/finance'
 import { formatINR } from '@/lib/format'
 import { SCHEMES, matchSchemes } from '@/lib/schemes'
-import { demoOcrExtract, maskSensitive } from '@/lib/demo'
-import {
-  cleanOcrText, mergeVisionWithEvidence, reconcileOcrPasses, validateVisionResult,
-} from '@/lib/receiptEngine'
-import { callOpenAIJson, getOpenAIReceiptConfig, getOpenAIInsightsConfig } from '@/lib/openaiVision'
+import { maskSensitive } from '@/lib/demo'
+import { callOpenAIJson, getOpenAIInsightsConfig } from '@/lib/openaiVision'
 import { searchEarnRadarOpportunities, normalizePublicHttpUrl } from '@/lib/earnRadarService.js'
 import { classifyEarnRadarStorageError, isEarnRadarDuplicateError, isSaveableEarnRadarOpportunity, sanitizeSavedCompensation } from '@/lib/earnRadarPersistence.js'
 import { EARN_RADAR_STATUSES } from '@/lib/earnRadarRules.js'
@@ -20,6 +23,7 @@ import { EARN_RADAR_STATUSES } from '@/lib/earnRadarRules.js'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+let sampleScan
 const BUCKET = 'receipts'
 function earnRadarStorageFailure(error) {
   // Log only machine-readable error code to avoid leaking DB detail into logs/responses.
@@ -128,7 +132,7 @@ async function loadUserContext(supabase, uid) {
     supabase.from('savings_goals').select('*').eq('user_id', uid).order('priority', { ascending: true }),
     supabase.from('receipts').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
   ])
-  return { profile: pr?.[0] || null, goals: goals || [], receipts: receipts || [] }
+  return { profile: pr?.[0] || null, goals: goals || [], receipts: (receipts || []).filter(r=>pr?.[0]?.user_type!=='micro_entrepreneur'||!r.ocr_origin) }
 }
 
 function spendingByCategory(receipts) {
@@ -196,10 +200,40 @@ async function handleRoute(request, { params }) {
     if (route === '/root' && method === 'GET') return json({ message: 'RupeeRizz API (Supabase)', ok: true })
     if (route === '/schemes' && method === 'GET') return json({ schemes: SCHEMES })
 
+    // The public judge demo processes only a bundled synthetic image. No upload is accepted.
+    if(route==='/demo/document'&&method==='GET'){
+      sampleScan??=readFile(pathModule.join(process.cwd(),'public','ocr','sample-supplier.png')).then(async bytes=>({extraction:await recognize(bytes),source_sha256:digest(bytes)})).catch(err=>{sampleScan=null;throw err})
+      return json(await sampleScan)
+    }
     const auth = await getAuth(request)
     if (!auth) return json({ error: 'Not authenticated', code: 'no_auth' }, 401)
     const { supabase, user } = auth
     const uid = user.id
+
+    if (route === '/business') {
+      if (!(await hasConsent(supabase,uid))) return json({error:'Active consent required.'},403)
+      const {data:profile}=await supabase.from('profiles').select('user_type').eq('user_id',uid).maybeSingle()
+      if (profile?.user_type!=='micro_entrepreneur') return json({error:'Business profile required.'},403)
+      if (method==='GET') {
+        const [entries,receipts]=await Promise.all([ownedRows(supabase,'business_entries',uid),ownedRows(supabase,'receipts',uid,'id,merchant,receipt_date,total,category,currency,user_verified,image_path,items,source_sha256,reviewed_business,ocr_origin')])
+        return json({entries,receipts:receipts.map(({image_path,...r})=>({...r,has_source:!!image_path}))})
+      }
+      const body=await request.json()
+      let query
+      if (method==='POST') {
+        const fields=['id','day','kind','amount','method','category','party','item','units','reorder','invoice','gstin','tax','receipt_id','stock_lines']
+        if (!body.day || body.day>today()) return json({error:'Choose today or an earlier date.'},400)
+        query=supabase.from('business_entries').insert(Object.fromEntries(fields.map(k=>[k,body[k]])))
+      } else if(method==='PATCH') {
+        const target=()=>supabase.from('business_entries')
+        if(body.receipt_id) query=target().update({receipt_id:body.receipt_id}).is('receipt_id',null)
+        else query=target().update({paid_on:today(),paid_by:body.paid_by}).eq('method','udhaar').is('paid_on',null)
+        query=query.eq('id',body.id).eq('user_id',uid)
+      } else return json({error:'Unsupported operation.'},405)
+      const {data,error}=await query.select('*').single()
+      if(error) return json({error:error.code==='23505'?'Entry or receipt already recorded. Refresh the ledger.':'Could not save. Check the fields and refresh the ledger.'},400)
+      return json({entry:data})
+    }
 
     // ---------- EARN RADAR: live search + saved opportunity tracking ----------
     if (route === '/earn-radar/search' && method === 'POST') {
@@ -342,122 +376,19 @@ async function handleRoute(request, { params }) {
     if (route === '/ocr/receipt' && method === 'POST') {
       if (!(await hasConsent(supabase, uid))) return json({ error: 'Consent required before scanning receipts.', code: 'consent_required' }, 403)
       if (!rateLimit(uid, 'ocr', 20)) return json({ error: 'Too many uploads. Please wait a bit.', code: 'rate_limited' }, 429)
-      if (!rateLimit(uid, 'receipt-ai', 8)) return json({ error: 'AI receipt analysis is rate-limited. Please try again shortly.', code: 'ai_rate_limited' }, 429)
-
       const body = await request.json().catch(() => ({}))
       const parsed = parseDataUrl(body.image)
       if (!parsed) return json({ error: 'A valid image is required.', code: 'bad_image' }, 400)
       if (!ALLOWED_MIME.includes(parsed.mime)) return json({ error: 'Only JPG, PNG or WebP images are allowed.', code: 'bad_mime' }, 400)
       if (parsed.bytes > 10 * 1024 * 1024) return json({ error: 'Image must be under 10 MB.', code: 'too_large' }, 400)
 
-      const ocrConfigured = !!process.env.OCR_API_KEY && (process.env.OCR_PROVIDER || 'ocrspace') === 'ocrspace'
-      const llmConfigured = !!(process.env.OPENAI_API_KEY || process.env.EMERGENT_LLM_KEY)
-      const requestedMode = (process.env.OCR_MODE || 'live').toLowerCase()
-      const mode = requestedMode === 'demo' ? 'demo' : 'live'
-      const { count } = await supabase.from('receipts').select('id', { count: 'exact', head: true }).eq('user_id', uid)
-
-      let extraction = null
-      let usedMode = 'demo'
-
-      if (mode === 'live' && !ocrConfigured && !llmConfigured) {
-        return json({ error: 'Live receipt AI is not configured. Add OPENAI_API_KEY for direct OpenAI vision, optionally OCR_API_KEY for OCR.space corroboration, or set OCR_MODE=demo intentionally.', code: 'ai_not_configured' }, 503)
+      const bytes=Buffer.from(parsed.b64,'base64')
+      try {
+        const extraction=await recognize(bytes,body.language||'en')
+        return json({extraction:{...extraction,ticket:seal(extraction,bytes,uid)},mode:'local',sensitive_found:[]})
+      } catch {
+        return json({error:'Local scan unavailable. Check the installed language pack and signing key, or retry a smaller, clearer image.'},503)
       }
-
-      if (mode === 'live' && (ocrConfigured || llmConfigured)) {
-        try {
-          const quality = await assessReceiptImageQuality(body.image)
-          const enhanced = await preprocessReceiptImage(body.image)
-          const ocr = ocrConfigured
-            ? await ocrSpaceExtractMultiPass(body.image, process.env.OCR_API_KEY)
-            : { pass1: { text: '', ok: false }, pass2: { text: '', ok: false }, pass_count: 0, enhanced }
-          const rawText = [ocr.pass1?.text, ocr.pass2?.text].filter(Boolean).join('\n\n--- OCR PASS ---\n\n')
-          const evidence = reconcileOcrPasses(ocr.pass1?.text || '', ocr.pass2?.text || '')
-          let vision = llmConfigured
-            ? await structureReceiptWithVisionLLM({ originalDataUrl: body.image, enhancedDataUrl: ocr.enhanced || enhanced, ocr })
-            : null
-
-          const visionValid = vision && !vision.__llm_error ? vision : null
-          const visionTotal = visionValid?.total != null ? Number(visionValid.total) : null
-          const ocrTotal = evidence?.total != null ? Number(evidence.total) : null
-          const needsArbitration = !!visionValid && (
-            !!evidence?.evidence?.ocr_conflict ||
-            (visionTotal != null && ocrTotal != null && Math.abs(visionTotal - ocrTotal) >= 0.011) ||
-            (visionValid.needs_user_verification || []).includes('total')
-          )
-
-          if (needsArbitration) {
-            const arbiter = await arbitrateReceiptWithVisionLLM({
-              originalDataUrl: body.image,
-              enhancedDataUrl: ocr.enhanced || enhanced,
-              ocr: evidence,
-              firstVision: visionValid,
-            })
-            if (arbiter && !arbiter.__llm_error) vision = arbiter
-          }
-
-          extraction = mergeVisionWithEvidence(vision?.__llm_error ? null : vision, evidence, rawText, quality)
-          extraction.extraction_meta = {
-            ...extraction.extraction_meta,
-            llm_configured: llmConfigured,
-            llm_used: !!vision && !vision.__llm_error,
-            llm_provider: vision?.llm_meta?.provider || null,
-            llm_model: vision?.llm_meta?.model || null,
-            llm_role: vision?.llm_meta?.role || 'primary',
-            llm_error: vision?.__llm_error || null,
-            llm_status: vision?.__llm_error ? 'failed' : (vision ? 'used' : (llmConfigured ? 'not_used' : 'not_configured')),
-            ocr_provider_configured: ocrConfigured,
-            ocr_passes_completed: ocr.pass_count,
-            provider: ocrConfigured ? (process.env.OCR_PROVIDER || 'ocrspace') : 'openai-vision-only',
-            image_quality: quality,
-          }
-          usedMode = vision
-            ? (ocrConfigured ? 'live_openai_vision_ocr_hybrid' : 'live_openai_vision')
-            : (ocrConfigured ? 'live_ocr_hybrid' : 'live_needs_verification')
-        } catch (e) {
-          console.error('live receipt analysis failed:', e?.message)
-        }
-      }
-
-      if (!extraction) {
-        if (mode === 'live') {
-          extraction = {
-            merchant: null,
-            date: null,
-            currency: 'INR',
-            total: null,
-            total_confidence: 0,
-            items: [],
-            needs_user_verification: ['merchant', 'date', 'total'],
-            extraction_meta: {
-              version: '3.0',
-              verified: false,
-              llm_configured: llmConfigured,
-              llm_used: false,
-              failure: true,
-            },
-          }
-          usedMode = 'live_needs_verification'
-        } else {
-          extraction = demoOcrExtract(count || 0)
-          usedMode = 'demo'
-        }
-      }
-
-      const merchantScan = maskSensitive(extraction.merchant || '')
-      return json({
-        extraction,
-        mode: usedMode,
-        sensitive_found: merchantScan.found,
-        pipeline: {
-          ocr: ocrConfigured ? 'OCR.space Engine 2 · dual-pass · original + enhanced' : 'OpenAI vision OCR · image-aware',
-          llm: llmConfigured ? `${extraction.extraction_meta?.llm_provider || 'openai-direct'} / ${extraction.extraction_meta?.llm_model || process.env.OPENAI_RECEIPT_MODEL || 'gpt-5.6-sol'} · multimodal` : 'not configured',
-          verification_required: (extraction.needs_user_verification || []).length > 0,
-          direct_openai: !!process.env.OPENAI_API_KEY,
-          emergent_fallback: !!process.env.EMERGENT_LLM_KEY,
-          image_quality: extraction.extraction_meta?.image_quality || null,
-          arithmetic: extraction.evidence?.arithmetic || null,
-        },
-      })
     }
 
     // ---------- RECEIPTS ----------
@@ -470,20 +401,24 @@ async function handleRoute(request, { params }) {
       const body = await request.json().catch(() => ({}))
       const rid = uuidv4()
       const mMerchant = maskSensitive(body.merchant || '')
-      const items = (body.items || []).map((it) => ({ item_name: maskSensitive(it.item_name || it.name || '').text, price: Number(it.price) || 0, category: it.category || 'Other', confidence: it.confidence ?? null }))
-      let image_path = null
-      const parsed = parseDataUrl(body.image)
-      if (parsed && ALLOWED_MIME.includes(parsed.mime) && parsed.bytes <= 8 * 1024 * 1024) {
-        try {
-          image_path = `${uid}/${rid}/original_receipt.jpg`
-          const buffer = Buffer.from(parsed.b64, 'base64')
-          const { error: upErr } = await supabase.storage.from(BUCKET).upload(image_path, buffer, { contentType: parsed.mime, upsert: false })
-          if (upErr) { console.error('storage upload:', upErr.message); image_path = null }
-        } catch (e) { console.error('storage err', e?.message); image_path = null }
+      if(body.user_verified!==true || !Number.isFinite(body.total)||body.total<=0 || !body.receipt_date || !mMerchant.text) return json({error:'Confirm merchant, date and a positive total before saving.'},400)
+      const parsed=parseDataUrl(body.image)
+      if(!parsed || !ALLOWED_MIME.includes(parsed.mime)||parsed.bytes>10*1024*1024)return json({error:'A valid source image under 10 MB is required.'},400)
+      const bytes=Buffer.from(parsed.b64,'base64')
+      const origin=unseal(body.ticket,bytes,uid)
+      if(!origin)return json({error:'Scan this source image again before confirming.'},400)
+      const items=(body.items||[]).map(it=>({item_name:maskSensitive(it.item_name||'').text,price:it.price??null,quantity:it.quantity??null,unit_price:it.unit_price??null,unit:it.unit??null,sku:it.sku??null,category:it.category||'Other'}))
+      let business
+      try{business=reviewedBusiness(body.reviewed_business,body.total)}catch(e){return json({error:e.message},400)}
+      const image_path=uid+'/'+rid+'/source.'+(parsed.mime.split('/')[1])
+      const {error:upErr}=await supabase.storage.from(BUCKET).upload(image_path,bytes,{contentType:parsed.mime,upsert:false})
+      if(upErr)return json({error:'Source image could not be stored privately. Retry.'},503)
+      const row={id:rid,user_id:uid,merchant:mMerchant.text,receipt_date:body.receipt_date,total:body.total,currency:'INR',category:body.category||'Other',user_verified:true,items,image_path,source_sha256:digest(bytes),ocr_origin:origin,reviewed_business:business,overall_confidence:origin.meta.overall_confidence}
+      const {data,error}=await supabase.from('receipts').insert(row).select().single()
+      if(error){
+        await supabase.storage.from(BUCKET).remove([image_path])
+        return json({error:error.code==='23505'?'This image or supplier invoice is already recorded. Open the existing receipt.':'Receipt could not be saved.'},error.code==='23505'?409:400)
       }
-      const row = { id: rid, user_id: uid, merchant: mMerchant.text, receipt_date: body.receipt_date || null, currency: body.currency || 'INR', total: body.total != null ? Number(body.total) : null, category: body.category || (items[0]?.category) || 'Other', image_path, overall_confidence: body.overall_confidence ?? null, user_verified: body.user_verified !== false, items }
-      const { data, error } = await supabase.from('receipts').insert(row).select().single()
-      if (error) return json({ error: error.message }, 400)
       return json({ receipt: data, sensitive_masked: mMerchant.found })
     }
     if (path[0] === 'receipts' && path.length === 3 && path[2] === 'image' && method === 'GET') {
@@ -499,11 +434,22 @@ async function handleRoute(request, { params }) {
       if (!data?.[0]) return json({ error: 'Not found' }, 404)
       return json({ receipt: data[0] })
     }
+    if(path[0]==='receipts'&&path[2]==='review'&&path.length===3&&method==='PUT'){
+      if(!(await hasConsent(supabase,uid)))return json({error:'Active consent required.'},403)
+      const doc=await request.json()
+      if(!doc.user_verified||!Number.isFinite(doc.total)||doc.total<=0||!Array.isArray(doc.items))return json({error:'Confirm all receipt values.'},400)
+      try{doc.reviewed_business=reviewedBusiness(doc.reviewed_business,doc.total)}catch(e){return json({error:e.message},400)}
+      doc.merchant=maskSensitive(doc.merchant).text
+      doc.items=doc.items.map(it=>({...it,item_name:maskSensitive(it.item_name||'').text}))
+      const {error}=await supabase.rpc('correct_document',{p_id:path[1],p_revision:doc.revision,p_doc:doc})
+      if(error)return json({error:'Correction conflicts with the current review, stock lines or payment history. Reload and check the fields.'},409)
+      return json({ok:true})
+    }
     if (path[0] === 'receipts' && path.length === 2 && method === 'PUT') {
       const body = await request.json().catch(() => ({}))
       const items = (body.items || []).map((it) => ({ item_name: maskSensitive(it.item_name || it.name || '').text, price: Number(it.price) || 0, category: it.category || 'Other', confidence: it.confidence ?? null }))
       const upd = { merchant: maskSensitive(body.merchant || '').text, receipt_date: body.receipt_date || null, total: body.total != null ? Number(body.total) : null, category: body.category || 'Other', items, user_verified: true }
-      const { data, error } = await supabase.from('receipts').update(upd).eq('id', path[1]).select()
+      const { data, error } = await supabase.from('receipts').update(upd).eq('id', path[1]).is('ocr_origin',null).select()
       if (error) return json({ error: error.message }, 400)
       if (!data?.length) return json({ error: 'Not found' }, 404)
       return json({ receipt: data[0] })
@@ -708,9 +654,12 @@ async function handleRoute(request, { params }) {
         supabase.from('goal_contributions').select('*').eq('user_id', uid),
         supabase.from('earn_radar_saved').select('*').eq('user_id', uid),
       ])
-      return json({ export: { user: { id: uid, email: user.email }, profile: profile?.[0] || null, consents: consents || [], receipts: receipts || [], goals: goals || [], contributions: contributions || [], earn_radar_saved: earnRadarSaved || [], exported_at: new Date().toISOString() } })
+      const business_entries=await ownedRows(supabase,'business_entries',uid)
+      return json({ export: { business_entries, user: { id: uid, email: user.email }, profile: profile?.[0] || null, consents: consents || [], receipts: receipts || [], goals: goals || [], contributions: contributions || [], earn_radar_saved: earnRadarSaved || [], exported_at: new Date().toISOString() } })
     }
     if (route === '/my-data/delete' && method === 'POST') {
+      const {error:eraseError}=await supabase.rpc('erase_own_business_entries')
+      if(eraseError) throw eraseError
       const { data: receipts } = await supabase.from('receipts').select('image_path').eq('user_id', uid)
       const paths = (receipts || []).map((r) => r.image_path).filter(Boolean)
       if (paths.length) { try { await supabase.storage.from(BUCKET).remove(paths) } catch (e) {} }
@@ -750,146 +699,7 @@ function parseModelJson(raw) {
 }
 
 // ---------------- Live OCR (OCR.space) + multimodal LLM ----------------
-function dataUrlToBuffer(dataUrl) {
-  const parsed = parseDataUrl(dataUrl)
-  if (!parsed) return null
-  return Buffer.from(parsed.b64, 'base64')
-}
-
-function bufferToDataUrl(buffer, mime = 'image/jpeg') {
-  return `data:${mime};base64,${Buffer.from(buffer).toString('base64')}`
-}
-
-
-async function assessReceiptImageQuality(dataUrl) {
-  const input = dataUrlToBuffer(dataUrl)
-  if (!input) return { score: 0, level: 'low', warnings: ['Invalid image data.'] }
-  const base = sharp(input, { failOn: 'none' }).rotate()
-  const meta = await base.metadata()
-  const sample = await base.clone().resize({ width: 256, height: 256, fit: 'inside' }).grayscale().raw().toBuffer({ resolveWithObject: true })
-  const data = sample.data
-  const width = sample.info.width
-  const height = sample.info.height
-  let sum = 0
-  let sum2 = 0
-  let bright = 0
-  for (const px of data) {
-    sum += px
-    sum2 += px * px
-    if (px >= 250) bright++
-  }
-  const count = Math.max(1, data.length)
-  const mean = sum / count
-  const variance = Math.max(0, sum2 / count - mean * mean)
-  let lapSum = 0
-  let lapSum2 = 0
-  let lapCount = 0
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x
-      const lap = data[i - width] + data[i - 1] + data[i + 1] + data[i + width] - 4 * data[i]
-      lapSum += lap
-      lapSum2 += lap * lap
-      lapCount++
-    }
-  }
-  const lapMean = lapCount ? lapSum / lapCount : 0
-  const lapVariance = lapCount ? Math.max(0, lapSum2 / lapCount - lapMean * lapMean) : 0
-  const glareRatio = bright / count
-  const widthPx = meta.width || width
-  const heightPx = meta.height || height
-  const longest = Math.max(widthPx, heightPx)
-  const shortest = Math.min(widthPx, heightPx)
-  const aspect = shortest ? longest / shortest : 0
-
-  const warnings = []
-  let score = 100
-  if (longest < 1200) { score -= 25; warnings.push('Image resolution is low for small receipt text.') }
-  if (variance < 900) { score -= 20; warnings.push('Image contrast is low.') }
-  if (lapVariance < 40) { score -= 25; warnings.push('Image may be blurry or out of focus.') }
-  if (glareRatio > 0.10) { score -= 15; warnings.push('Bright glare/washed-out areas may hide text.') }
-  if (aspect > 8) { score -= 10; warnings.push('Receipt is extremely narrow; capture the full page if possible.') }
-  score = Math.max(0, Math.min(100, Math.round(score)))
-  return {
-    score,
-    level: score >= 80 ? 'high' : score >= 60 ? 'medium' : 'low',
-    warnings: [...new Set(warnings)],
-    metrics: { width: widthPx, height: heightPx, mean_brightness: Math.round(mean), contrast: Math.round(Math.sqrt(variance)), sharpness: Math.round(lapVariance), glare_ratio: Number(glareRatio.toFixed(3)) },
-  }
-}
-
-async function preprocessReceiptImage(dataUrl) {
-  const input = dataUrlToBuffer(dataUrl)
-  if (!input) throw new Error('Invalid receipt image')
-  const image = sharp(input, { failOn: 'none' }).rotate()
-  const meta = await image.metadata()
-  const longest = Math.max(meta.width || 0, meta.height || 0)
-  const target = Math.min(2600, Math.max(1800, longest || 2200))
-  const enhanced = await image
-    .flatten({ background: '#ffffff' })
-    .resize({ width: target, height: target, fit: 'inside', withoutEnlargement: false, kernel: sharp.kernel.lanczos3 })
-    .grayscale()
-    .normalize({ lower: 1, upper: 99 })
-    .sharpen({ sigma: 1.05, m1: 0.8, m2: 2.2 })
-    .jpeg({ quality: 94, chromaSubsampling: '4:4:4' })
-    .toBuffer()
-  return bufferToDataUrl(enhanced)
-}
-
-async function ocrSpaceExtractText(dataUrl, apiKey, engine = '2', isTable = true) {
-  const parsed = parseDataUrl(dataUrl)
-  if (!parsed) return ''
-  const ftMap = { 'image/png': 'PNG', 'image/jpeg': 'JPG', 'image/jpg': 'JPG', 'image/webp': 'JPG' }
-  const form = new FormData()
-  form.append('base64Image', dataUrl)
-  form.append('language', 'auto')
-  form.append('isTable', isTable ? 'true' : 'false')
-  form.append('OCREngine', engine)
-  form.append('scale', 'true')
-  form.append('detectOrientation', 'true')
-  form.append('isOverlayRequired', 'false')
-  if (ftMap[parsed.mime]) form.append('filetype', ftMap[parsed.mime])
-  const res = await fetch('https://api.ocr.space/parse/image', {
-    method: 'POST',
-    headers: { apikey: apiKey },
-    body: form,
-    cache: 'no-store',
-    signal: AbortSignal.timeout(30000),
-  })
-  if (!res.ok) throw new Error(`OCR provider HTTP ${res.status}`)
-  const data = await res.json()
-  if (data?.IsErroredOnProcessing) {
-    const msg = Array.isArray(data.ErrorMessage) ? data.ErrorMessage.join('; ') : (data.ErrorMessage || 'OCR error')
-    throw new Error(msg)
-  }
-  const results = Array.isArray(data.ParsedResults) ? data.ParsedResults : []
-  return results.map((r) => r?.ParsedText || '').join('\n').trim()
-}
-
-async function ocrSpaceExtractMultiPass(dataUrl, apiKey) {
-  const enhanced = await preprocessReceiptImage(dataUrl)
-  const results = await Promise.allSettled([
-    ocrSpaceExtractText(dataUrl, apiKey, '2', true),
-    ocrSpaceExtractText(enhanced, apiKey, '2', true),
-  ])
-  const pass1 = results[0]?.status === 'fulfilled' ? cleanOcrText(results[0].value) : ''
-  const pass2 = results[1]?.status === 'fulfilled' ? cleanOcrText(results[1].value) : ''
-  return {
-    pass1: { text: pass1, ok: !!pass1 },
-    pass2: { text: pass2, ok: !!pass2 },
-    pass_count: [pass1, pass2].filter(Boolean).length,
-    enhanced,
-  }
-}
-
-function emergentLlmConfig(kind = 'receipt') {
-  if (kind === 'receipt') {
-    return {
-      provider: process.env.EMERGENT_RECEIPT_LLM_PROVIDER || process.env.RECEIPT_LLM_PROVIDER || 'openai',
-      model: process.env.EMERGENT_RECEIPT_LLM_MODEL || process.env.RECEIPT_LLM_MODEL || 'gpt-4o',
-      fallbackModel: process.env.EMERGENT_RECEIPT_LLM_FALLBACK_MODEL || process.env.RECEIPT_LLM_FALLBACK_MODEL || 'gpt-4o-mini',
-    }
-  }
+function emergentLlmConfig() {
   return {
     provider: process.env.EMERGENT_INSIGHTS_LLM_PROVIDER || process.env.INSIGHTS_LLM_PROVIDER || 'openai',
     model: process.env.EMERGENT_INSIGHTS_LLM_MODEL || process.env.INSIGHTS_LLM_MODEL || 'gpt-4o-mini',
@@ -910,25 +720,23 @@ const INSIGHT_JSON_SCHEMA = {
   required: ['insight', 'suggested_action', 'estimated_monthly_saving', 'related_goal_id', 'safety_note'],
 }
 
-async function runLlmJson({ system, text, images = [], kind = 'receipt', session }) {
+async function runLlmJson({ system, text, kind = 'insight', session }) {
   // Primary provider: direct OpenAI API. This is independent of Emergent credits.
   if (process.env.OPENAI_API_KEY) {
-    const cfg = kind === 'receipt' ? getOpenAIReceiptConfig() : getOpenAIInsightsConfig()
-    const candidates = kind === 'receipt'
-      ? [cfg.model, cfg.fallbackModel]
-      : [cfg.model, cfg.fallbackModel]
+    const cfg = getOpenAIInsightsConfig()
+    const candidates = [cfg.model,cfg.fallbackModel]
     let lastError = null
     for (const model of candidates.filter((m, i, a) => m && a.indexOf(m) === i)) {
       try {
         const result = await callOpenAIJson({
           system,
           text,
-          images,
+
           model,
-          schema: kind === 'receipt' ? undefined : INSIGHT_JSON_SCHEMA,
-          schemaName: kind === 'receipt' ? 'rupeerizz_receipt_extraction' : 'rupeerizz_financial_insight',
+          schema: INSIGHT_JSON_SCHEMA,
+          schemaName: 'rupeerizz_financial_insight',
           reasoningEffort: cfg.reasoningEffort,
-          maxOutputTokens: kind === 'receipt' ? cfg.maxOutputTokens : cfg.maxOutputTokens,
+          maxOutputTokens: cfg.maxOutputTokens,
           timeoutMs: cfg.timeoutMs,
         })
         if (result?.parsed) return result
@@ -946,28 +754,20 @@ async function runLlmJson({ system, text, images = [], kind = 'receipt', session
 
   // Secondary provider: Emergent, retained as a fallback for users who still have credits.
   if (!process.env.EMERGENT_LLM_KEY) return null
-  const { LlmChat, UserMessage, ImageContent } = await import('emergentintegrations')
+  const { LlmChat, UserMessage } = await import('emergentintegrations')
   const cfg = emergentLlmConfig(kind)
   const candidates = [cfg.model, cfg.fallbackModel].filter((m, i, arr) => m && arr.indexOf(m) === i)
   let lastError = null
 
   for (const model of candidates) {
     try {
-      const params = { max_completion_tokens: kind === 'receipt' ? 1600 : 700 }
+      const params = { max_completion_tokens: 700 }
       if (cfg.provider === 'openai') params.response_format = { type: 'json_object' }
       const chat = new LlmChat(process.env.EMERGENT_LLM_KEY, session || `${kind}-${Date.now()}`, system)
         .withModel(cfg.provider, model)
         .withParams(params)
 
-      const fileContents = images
-        .filter(Boolean)
-        .map((dataUrl) => {
-          const p = parseDataUrl(dataUrl)
-          return p ? new ImageContent(p.b64) : null
-        })
-        .filter(Boolean)
-
-      const reply = await chat.sendMessage(new UserMessage({ text, file_contents: fileContents }))
+      const reply = await chat.sendMessage(new UserMessage({ text }))
       const parsed = parseModelJson(reply)
       if (parsed) return { parsed, model, provider: 'emergent' }
       throw new Error('LLM returned non-JSON output')
@@ -977,63 +777,6 @@ async function runLlmJson({ system, text, images = [], kind = 'receipt', session
     }
   }
   return { error: lastError?.message || 'LLM request failed' }
-}
-
-async function structureReceiptWithVisionLLM({ originalDataUrl, enhancedDataUrl, ocr }) {
-  if (!process.env.OPENAI_API_KEY && !process.env.EMERGENT_LLM_KEY) return null
-  const system = [
-    'You are RupeeRizz Receipt Vision, a strict financial-document extraction engine.',
-    'The receipt image is the primary evidence. OCR text is supporting evidence and may be wrong.',
-    'Read the printed document layout, not just isolated numbers. Distinguish totals from item counts, quantities, tax, tender/payment amounts, cashier IDs, invoice numbers and barcode values.',
-    'The grand/net/payable invoice total is the amount the customer owes for the receipt. Never use NO. OF ITEMS or TOTAL QTY as the receipt total.',
-    'For an item, use the printed line item description and the line amount in the receipt table. Do not create items from tax, payment, cashier, counter, tender, subtotal or metadata lines.',
-    'Return ONLY valid JSON. Never invent a value. If the image is ambiguous, return null and add the field to needs_user_verification.',
-    'Use YYYY-MM-DD for dates. Default currency to INR unless another currency is clearly printed.',
-    'Return an overall receipt category based on the purchased items and merchant.',
-    `Allowed categories: ${['Food & Drinks', 'Travel', 'Shopping', 'Education', 'Bills', 'Health', 'Business Supplies', 'Inventory', 'Rent', 'Marketing', 'Other'].join(', ')}.`,
-    'If item prices are readable, check whether their arithmetic supports the final invoice amount. Treat arithmetic as a validation signal, not a reason to invent missing values.',
-  ].join('\n')
-
-  const p1 = ocr?.pass1?.text || '(OCR pass 1 unavailable)'
-  const p2 = ocr?.pass2?.text || '(OCR pass 2 unavailable)'
-  const prompt = [
-    'Analyze the attached receipt image(s). Use the original image as the source of truth and the enhanced image for faint text.',
-    'OCR PASS 1:', p1.slice(0, 3500),
-    'OCR PASS 2:', p2.slice(0, 3500),
-    'Produce the final structured receipt fields. Focus especially on the printed TOTAL/GRAND TOTAL/AMOUNT PAYABLE and line-item table.',
-  ].join('\n\n')
-
-  const images = [originalDataUrl]
-  if (enhancedDataUrl && enhancedDataUrl !== originalDataUrl) images.push(enhancedDataUrl)
-  const result = await runLlmJson({ system, text: prompt, images, kind: 'receipt', session: `receipt-${Date.now()}` })
-  if (!result || result.error) return result ? { __llm_error: result.error } : null
-  const validated = validateVisionResult(result.parsed)
-  if (!validated) return { __llm_error: 'LLM returned invalid structured output' }
-  validated.llm_meta = { model: result.model, provider: result.provider, response_id: result.response_id || null }
-  return validated
-}
-
-async function arbitrateReceiptWithVisionLLM({ originalDataUrl, enhancedDataUrl, ocr, firstVision }) {
-  if (!process.env.OPENAI_API_KEY && !process.env.EMERGENT_LLM_KEY) return null
-  const cfg = getOpenAIReceiptConfig()
-  const system = [
-    'You are the final RupeeRizz receipt adjudicator.',
-    'Resolve disagreements between OCR and a first vision extraction by re-reading the receipt image.',
-    'Never guess. For every disputed field, select a value only when the printed receipt clearly supports it; otherwise return null and request verification.',
-    'The field total means the final amount payable on the receipt, not item count, total quantity, tax, subtotal, cash tendered or a payment authorization value unless it is explicitly the final payable amount.',
-    'Do not create metadata such as cashier IDs or invoice numbers as line items.',
-  ].join('\n')
-  const prompt = [
-    'OCR evidence:', JSON.stringify(ocr?.evidence || null),
-    'First vision extraction:', JSON.stringify(firstVision || null),
-    'Re-read the attached image and return the best-supported structured extraction.',
-  ].join('\n\n')
-  const result = await runLlmJson({ system, text: prompt, images: [originalDataUrl, enhancedDataUrl], kind: 'receipt', session: `receipt-arbiter-${Date.now()}` })
-  if (!result || result.error) return result ? { __llm_error: result.error } : null
-  const validated = validateVisionResult(result.parsed)
-  if (!validated) return { __llm_error: 'Arbiter returned invalid structured output' }
-  validated.llm_meta = { model: result.model, provider: result.provider, response_id: result.response_id || null, role: 'arbiter' }
-  return validated
 }
 
 async function generateInsightWithLLM(system, prompt, uid) {

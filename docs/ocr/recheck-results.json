@@ -1,0 +1,290 @@
+[
+  {
+    "file": "0.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 247
+  },
+  {
+    "file": "0.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 349
+  },
+  {
+    "file": "1.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 243
+  },
+  {
+    "file": "1.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 332
+  },
+  {
+    "file": "2.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": false,
+      "date": false,
+      "total": false,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 0,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 393
+  },
+  {
+    "file": "2.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 709
+  },
+  {
+    "file": "3.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 257
+  },
+  {
+    "file": "3.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 297
+  },
+  {
+    "file": "4.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 262
+  },
+  {
+    "file": "4.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 319
+  },
+  {
+    "file": "5.json",
+    "language": "hi",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": false,
+      "total": false,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 448
+  },
+  {
+    "file": "5.json",
+    "language": "hi",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 372
+  },
+  {
+    "file": "6.json",
+    "language": "or",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": false,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 334
+  },
+  {
+    "file": "6.json",
+    "language": "or",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 367
+  },
+  {
+    "file": "7.json",
+    "language": "en",
+    "pipeline": "baseline",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": false,
+      "method": false,
+      "docType": false
+    },
+    "itemsDetected": 2,
+    "itemsMatched": 0,
+    "itemsExpected": 1,
+    "all": false,
+    "ms": 245
+  },
+  {
+    "file": "7.json",
+    "language": "en",
+    "pipeline": "local",
+    "fields": {
+      "merchant": true,
+      "date": true,
+      "total": true,
+      "invoice": true,
+      "method": true,
+      "docType": true
+    },
+    "itemsDetected": 1,
+    "itemsMatched": 1,
+    "itemsExpected": 1,
+    "all": true,
+    "ms": 1552
+  }
+]
