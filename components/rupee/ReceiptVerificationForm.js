@@ -168,6 +168,8 @@ export function ReceiptVerificationForm({ initial, onConfirm, saving }) {
               ['discount', 'Discount'],
               ['outstanding', 'Documented outstanding'],
               ['repayment_reference', 'Repayment reference'],
+              ['supplierState', 'Supplier state code'],
+              ['placeOfSupply', 'Place of supply state code'],
             ].map(([k, label]) => (
               <label key={k}>
                 {label}

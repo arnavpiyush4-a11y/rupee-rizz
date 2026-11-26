@@ -2,6 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/apiClient';
 import { money, paise, summarize, today, voiceDraft } from '@/lib/business';
+import {
+  PASSPORT_VERSION,
+  comparePassport,
+  passportFor,
+} from '@/lib/evidencePassport';
 import { ReceiptVerificationForm } from '@/components/rupee/ReceiptVerificationForm';
 import styles from './BusinessDesk.module.css';
 
@@ -231,52 +236,13 @@ export function BusinessDesk({ demo = false, onNav }) {
     }
   }
   function passport() {
-    const keys = [
-      'id',
-      'created_at',
-      'day',
-      'kind',
-      'method',
-      'amount',
-      'tax',
-      'category',
-      'party',
-      'item',
-      'stock_lines',
-      'units',
-      'reorder',
-      'invoice',
-      'gstin',
-      'receipt_id',
-      'paid_on',
-      'paid_by',
-    ];
-    const rows = entries.map((r) =>
-      Object.fromEntries(keys.map((k) => [k, r[k] ?? null])),
-    );
-    return {
-      version: 1,
+    return passportFor({
+      entries,
+      receipts: docs,
+      summary: info,
       demo,
       asOf: today(),
-      currency: 'INR',
-      moneyUnit: 'paise',
-      rule: 'Coverage = reviewed INR receipts matching entry date and gross amount / all entries. Owner-entered records; no independent authentication or credit decision.',
-      summary: info,
-      entries: rows,
-      receipts: docs
-        .filter((d) => used.has(d.id))
-        .map(({ id, receipt_date, total, currency, user_verified, has_source,source_sha256,ocr_origin,reviewed_business }) => ({
-          id,
-          receipt_date,
-          total,
-          currency,
-          user_verified,
-          has_source,
-          source_sha256:source_sha256||null,
-          provenance:ocr_origin?{engine:ocr_origin.meta?.engine,confidence:ocr_origin.meta?.overall_confidence,warnings:ocr_origin.meta?.warnings,extracted_total:ocr_origin.total,extracted_date:ocr_origin.date,corrected_fields:[...(ocr_origin.total!==Number(total)?['total']:[]),...(ocr_origin.date!==receipt_date?['date']:[])],reviewed_tax:reviewed_business?.tax}:null,
-          totalUnit: 'rupees',
-        })),
-    };
+    });
   }
   async function verify(file) {
     if (!file) return;
@@ -285,36 +251,16 @@ export function BusinessDesk({ demo = false, onNav }) {
         throw Error('Report exceeds the 10 MB comparison limit.');
       const saved = JSON.parse(await file.text());
       if (
-        saved.version !== 1 ||
+        saved.version !== PASSPORT_VERSION ||
         saved.demo !== demo ||
         !Array.isArray(saved.entries)
       )
         throw Error('Choose a passport exported from this workspace.');
-      const current = passport();
-      const lookup = new Map(current.entries.map((r) => [r.id, r]));
-      const match =
-        saved.entries.length === lookup.size &&
-        new Set(saved.entries.map((r) => r.id)).size === lookup.size &&
-        saved.entries.every(
-          (r) => JSON.stringify(r) === JSON.stringify(lookup.get(r.id)),
-        );
-      const recalculated = summarize(
-        current.entries,
-        current.receipts,
-        saved.asOf,
-      );
-      const receiptOrder = (rs) =>
-        [...rs].sort((a, b) => a.id.localeCompare(b.id));
-      const same =
-        match &&
-        Array.isArray(saved.receipts) &&
-        JSON.stringify(receiptOrder(saved.receipts)) ===
-          JSON.stringify(receiptOrder(current.receipts)) &&
-        JSON.stringify(saved.summary) === JSON.stringify(recalculated);
+      const { same, reasons } = comparePassport(saved, passport());
       setMessage(
         same
           ? 'Report entries and calculations match your current ledger.'
-          : 'Differences found. The ledger, receipt evidence or report has changed.',
+          : `Differences found. The ledger, receipt evidence or report has changed. ${reasons.join(' ')}`,
       );
     } catch (e) {
       setMessage(e.message);
