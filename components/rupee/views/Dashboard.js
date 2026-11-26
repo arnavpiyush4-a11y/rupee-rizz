@@ -72,7 +72,7 @@ export function Dashboard({ onNav }) {
         <div className="rr-dash-pulse">
           <div className="rr-dash-pulse-ring rr-dash-pulse-ring--a" />
           <div className="rr-dash-pulse-ring rr-dash-pulse-ring--b" />
-          <div className="rr-dash-pulse-core"><Wallet size={26} /><strong>{formatINR(s.safe_monthly_saving)}</strong><span>safe to save / month</span></div>
+          <div className="rr-dash-pulse-core"><Wallet size={26} /><strong>{formatINR(s.safe_monthly_saving)}</strong><span>Safe to save<br />per month</span></div>
           <span className="rr-dash-float rr-dash-float--one">+{data.health.score} health</span>
           <span className="rr-dash-float rr-dash-float--two">{data.top_category ? data.top_category.name : 'balanced'} focus</span>
         </div>

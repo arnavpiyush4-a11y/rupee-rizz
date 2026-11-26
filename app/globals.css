@@ -324,3 +324,314 @@ button { cursor: pointer; }
 @media(prefers-reduced-motion:reduce){.er-radar-sweep,.er-loader{animation:none}.er-btn,.er-opportunity-card{transition:none}}
 
 @media print { body:has([data-business-desk]) * {visibility:hidden} body [data-business-desk], body [data-business-desk] * {visibility:visible} }
+
+/* ==========================================
+   RupeeRizz - Responsive UI overlap fixes
+   ========================================== */
+
+/* 1. Dashboard heading */
+
+.rr-dash-hero-copy {
+  min-width: 0;
+}
+
+.rr-dash-hero-copy h1 {
+  font-size: clamp(30px, 3.8vw, 54px);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
+}
+
+.rr-dash-hero-copy p {
+  line-height: 1.6;
+}
+
+/* 2. Savings circle */
+
+.rr-dash-pulse {
+  min-width: 0;
+  height: 250px;
+}
+
+.rr-dash-pulse-core {
+  width: 156px;
+  height: 156px;
+  padding: 16px;
+  box-sizing: border-box;
+  gap: 6px;
+  text-align: center;
+}
+
+.rr-dash-pulse-core svg {
+  flex-shrink: 0;
+}
+
+.rr-dash-pulse-core strong {
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.rr-dash-pulse-core span {
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: normal;
+  max-width: 100px;
+  margin: 0;
+  color: #d0f5e9;
+}
+
+.rr-dash-pulse-ring--a {
+  width: 220px;
+  height: 220px;
+}
+
+.rr-dash-pulse-ring--b {
+  width: 184px;
+  height: 184px;
+}
+
+/* 3. Dashboard metric cards */
+
+.rr-dash-metric,
+.rr-dash-metric div,
+.rr-dash-story-number {
+  min-width: 0;
+}
+
+.rr-dash-metric strong,
+.rr-dash-story-number strong {
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.rr-dash-metric div > span {
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+}
+
+/* 4. Animated introduction */
+
+.rr-glyph-center-copy {
+  top: calc(var(--gp-word-bottom, 58%) + 16px);
+  transform: translateX(-50%);
+  width: min(960px, calc(100% - 40px));
+  color: #102a2f;
+}
+
+.rr-glyph-center-copy h1 {
+  font-size: clamp(24px, min(4.2vw, 5.5vh), 52px);
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.rr-glyph-center-copy h1 em {
+  color: #13866e;
+}
+
+.rr-glyph-center-copy p {
+  color: #526e65;
+  font-size: clamp(12px, 1.2vw, 15px);
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+.rr-glyph-eyebrow {
+  color: #426b5f;
+  white-space: normal;
+  width: max-content;
+  max-width: calc(100% - 48px);
+  text-align: center;
+}
+
+/* 5. Separate animation and landing content */
+
+.rr-glyph-landing [data-gp-pin] {
+  z-index: 0;
+}
+
+.rr-glyph-landing [data-gp-content] {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(
+    135deg,
+    #145b43 0%,
+    #0b3b2a 55%,
+    #08261c 100%
+  );
+  color: #ffffff;
+  min-height: 100svh;
+  padding-block: clamp(48px, 7vw, 100px);
+}
+
+.rr-glyph-landing
+[data-gp-motion="on"]
+[data-gp-content] {
+  margin-top: calc(
+    var(--gp-length) * var(--gp-height)
+  );
+  opacity: 1;
+  background: linear-gradient(
+    135deg,
+    #145b43,
+    #08261c
+  );
+}
+
+/* Keep preview details out of the clipped glyph.
+   These are decorative elements in MoneyScene. */
+
+.rr-glyph-landing
+[data-gp-entered="false"]
+[data-gp-field] > div > div:nth-child(n+4) {
+  visibility: hidden;
+}
+
+/* 6. Landing page typography and spacing */
+
+.rr-glyph-content-inner {
+  min-width: 0;
+}
+
+.rr-glyph-content-inner h2 {
+  font-size: clamp(34px, 6vw, 76px);
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.rr-glyph-content-lede {
+  line-height: 1.65;
+  color: #e0efe8;
+}
+
+.rr-glyph-action-row {
+  gap: 12px;
+}
+
+.rr-glyph-feature-grid {
+  gap: 28px;
+  margin-top: clamp(36px, 5vw, 64px);
+}
+
+.rr-glyph-feature {
+  min-width: 0;
+}
+
+.rr-glyph-feature p {
+  color: #c4dfd2;
+  line-height: 1.65;
+}
+
+.rr-glyph-proof-row {
+  row-gap: 10px;
+}
+
+/* 7. Responsive mobile layout */
+
+@media (max-width: 760px) {
+
+  .rr-dash-hero {
+    padding: 20px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rr-dash-pulse {
+    height: 240px;
+  }
+
+  .rr-dash-float--one {
+    top: 0;
+    right: 0;
+  }
+
+  .rr-dash-float--two {
+    bottom: 0;
+    left: 0;
+  }
+
+  .rr-glyph-topbar {
+    inset: 18px 20px auto;
+    gap: 12px;
+  }
+
+  .rr-glyph-center-copy h1 {
+    font-size: clamp(24px, 6vw, 38px);
+  }
+
+  .rr-glyph-center-copy p {
+    font-size: 12px;
+  }
+
+  .rr-glyph-feature-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rr-glyph-action-row > button {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .rr-glyph-landing [data-gp-caption] {
+    justify-content: flex-end;
+    bottom: 16px;
+  }
+
+  .rr-glyph-landing [data-gp-hint] {
+    display: none;
+  }
+
+  .rr-glyph-landing [data-gp-touch-picker] {
+    top: 76px;
+  }
+
+  .rr-glyph-eyebrow {
+    display: none;
+  }
+}
+
+/* 8. Short screens */
+
+@media (max-height: 520px) {
+
+  .rr-glyph-center-copy {
+    top: calc(var(--gp-word-bottom, 55%) + 8px);
+  }
+
+  .rr-glyph-center-copy h1 {
+    font-size: 24px;
+  }
+
+  .rr-glyph-center-copy p {
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  .rr-glyph-eyebrow {
+    display: none;
+  }
+}
+
+/* 9. Accessibility */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .rr-glyph-landing [data-gp-content] {
+    margin-top: 0 !important;
+    opacity: 1 !important;
+  }
+
+  .rr-dash-metric,
+  .rr-glyph-landing button {
+    transition: none;
+  }
+}
+
+/* End of RupeeRizz UI fixes */
