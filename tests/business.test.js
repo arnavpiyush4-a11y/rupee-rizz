@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarize, voiceDraft, paise } from '../lib/business.js';
+import {
+  summarize,
+  voiceDraft,
+  paise,
+  today,
+  isValidBusinessDate,
+} from '../lib/business.js';
 const purchase = {
   id: 'a',
   created_at: '1',
@@ -79,4 +85,43 @@ test('business entry uses integer paise and understands digit scripts', () => {
       rupees: '250',
     });
   assert.equal(voiceDraft('sold 2 bags for 50').rupees, undefined);
+});
+
+test('insufficient stock never creates negative inventory cost', () => {
+  const result = summarize(
+    [
+      {
+        ...purchase,
+        id: 'purchase-small',
+        units: 5,
+        amount: 5500,
+        tax: 500,
+      },
+      {
+        ...sale,
+        id: 'sale-large',
+        units: 8,
+        amount: 8000,
+        tax: 0,
+      },
+    ],
+    [],
+    '2026-01-30',
+  );
+
+  assert.equal(result.profit, null);
+  assert.equal(result.stock[0].units, -3);
+  assert.ok(result.stock[0].cost >= 0);
+});
+test('business dates accept valid past and current dates only', () => {
+  const asOf = '2026-11-26';
+
+  assert.equal(isValidBusinessDate('2026-11-25', asOf), true);
+  assert.equal(isValidBusinessDate('2026-11-26', asOf), true);
+  assert.equal(isValidBusinessDate('2026-11-27', asOf), false);
+
+  assert.equal(isValidBusinessDate('2026-02-30', asOf), false);
+  assert.equal(isValidBusinessDate('26-11-2026', asOf), false);
+  assert.equal(isValidBusinessDate('', asOf), false);
+  assert.equal(isValidBusinessDate(null, asOf), false);
 });
