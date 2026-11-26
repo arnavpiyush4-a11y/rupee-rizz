@@ -12,7 +12,8 @@
     "test:receipt": "node --test tests/receiptEngine.test.js tests/receiptLayout.test.js tests/receiptArithmetic.test.js tests/receiptCells.test.js tests/ocrEvidence.test.js",
     "test:grow": "node --test tests/growCalculators.test.js tests/growRules.test.js",
     "benchmark:receipt": "node scripts/receiptBenchmark.mjs",
-    "test:earn-radar": "node --test tests/earnRadarRules.test.js"
+    "test:earn-radar": "node --test tests/earnRadarRules.test.js",
+    "test:auth": "node --test tests/authSession.test.js tests/authRouting.test.js tests/authRecovery.test.js tests/authProfileLoad.test.js tests/authApiClient.test.js tests/authBannerLayout.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "5.1.1",
