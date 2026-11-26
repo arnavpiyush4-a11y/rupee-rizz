@@ -13,7 +13,8 @@
     "test:grow": "node --test tests/growCalculators.test.js tests/growRules.test.js",
     "benchmark:receipt": "node scripts/receiptBenchmark.mjs",
     "test:earn-radar": "node --test tests/earnRadarRules.test.js",
-    "test:gst": "node --test tests/gst.test.js"
+    "test:gst": "node --test tests/gst.test.js",
+    "test:auth": "node --test tests/authSession.test.js tests/authRouting.test.js tests/authRecovery.test.js tests/authProfileLoad.test.js tests/authApiClient.test.js tests/authBannerLayout.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "5.1.1",
@@ -68,14 +69,14 @@
     "react-hook-form": "7.58.1",
     "react-resizable-panels": "3.0.3",
     "recharts": "2.15.3",
+    "sharp": "0.35.4",
     "sonner": "2.0.5",
     "swr": "2.3.8",
     "tailwind-merge": "3.3.1",
     "tailwindcss-animate": "1.0.7",
     "uuid": "11.1.1",
     "vaul": "1.1.2",
-    "zod": "3.25.67",
-    "sharp": "0.35.4"
+    "zod": "3.25.67"
   },
   "devDependencies": {
     "@types/lodash": "4.17.24",

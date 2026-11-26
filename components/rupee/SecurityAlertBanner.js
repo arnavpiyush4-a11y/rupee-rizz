@@ -14,7 +14,10 @@ export function SecurityAlertBanner({ variant = 'info', children, className = ''
   return (
     <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${v.cls} ${className}`} role="status">
       <Icon className="h-4 w-4 mt-0.5 shrink-0" />
-      <div>{children}</div>
+      {/* `min-w-0` lets this column shrink inside the flex row; without it a long
+          word (an email address, a code) pushes the banner past the card edge on
+          narrow screens instead of wrapping. */}
+      <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">{children}</div>
     </div>
   );
 }
